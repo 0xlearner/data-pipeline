@@ -3,18 +3,44 @@ name = "data-pipeline"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "count_products"
+path = "src/bin/count_products.rs"
+
+[[bin]]
+name = "test_full_pipeline"
+path = "src/bin/test_full_pipeline.rs"
+
+[[bin]]
+name = "compare_api_data"
+path = "src/bin/compare_api_data.rs"
+
+[[bin]]
+name = "debug_columns"
+path = "src/bin/debug_columns.rs"
+
+[[bin]]
+name = "verify_column_fix"
+path = "src/bin/verify_column_fix.rs"
+
+[[bin]]
+name = "test_data_cleaning"
+path = "src/bin/test_data_cleaning.rs"
+
+[[bin]]
+name = "test_real_data_cleaning"
+path = "src/bin/test_real_data_cleaning.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-wreq = "5"
+wreq = { version = "5", features = ["json"] }
 wreq-util = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-minio = "0.3.0"
+regex = "1.5"
+toml = "0.9.6"
+rust-s3 = { version = "0.35", default-features = false, features = ["tokio-rustls-tls", "fail-on-err", "tags"] }
 polars = { version = "0.51.0", features = ["json", "parquet", "lazy"] }
-linfa = "0.7"
-linfa-linear = "0.7"
-linfa-preprocessing = "0.7"
-linfa-clustering = "0.7"
 ndarray = "0.16.1"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4"] }
@@ -24,3 +50,4 @@ anyhow = "1.0"
 config = "0.15.16"
 async-trait = "0.1"
 futures = "0.3"
+dotenv = "0.15"

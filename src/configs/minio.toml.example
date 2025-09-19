@@ -1,0 +1,81 @@
+# MinIO Storage Configuration Template
+# Copy this file to minio.toml and customize for your environment
+
+[minio]
+# MinIO server endpoint (can be local or remote)
+# Examples:
+#   - Local development: "http://localhost:9000"
+#   - Remote MinIO: "https://minio.company.com"
+#   - AWS S3: "https://s3.amazonaws.com"
+endpoint = "http://localhost:9000"
+
+# Bucket name for storing data pipeline artifacts
+# This bucket will store both raw JSON and processed Parquet files
+bucket_name = "data-pipeline"
+
+# AWS/MinIO region (optional, defaults to "us-east-1")
+# For AWS S3, use the appropriate region like "us-west-2", "eu-west-1", etc.
+# For MinIO, this can be any valid region string
+region = "us-east-1"
+
+# Use path-style URLs (optional, defaults to true)
+# - true: Recommended for MinIO (http://endpoint/bucket/key)
+# - false: For AWS S3 virtual-hosted style (http://bucket.endpoint/key)
+path_style = true
+
+# Use SSL/TLS connection (optional, auto-detected from endpoint if not specified)
+# If endpoint starts with "https://", SSL is automatically enabled
+# Uncomment to force SSL on/off:
+# ssl = true
+
+# Custom environment variable names (optional)
+# By default, the system looks for MINIO_ACCESS_KEY and MINIO_SECRET_KEY
+# Uncomment to use custom environment variable names:
+# env_access_key = "DATA_PIPELINE_ACCESS_KEY"
+# env_secret_key = "DATA_PIPELINE_SECRET_KEY"
+
+# IMPORTANT SECURITY NOTES:
+# =======================
+#
+# Credentials are NOT stored in this configuration file for security reasons.
+# Instead, they must be provided via environment variables.
+#
+# Default Environment Variables:
+#   MINIO_ACCESS_KEY=your_access_key_here
+#   MINIO_SECRET_KEY=your_secret_key_here
+#
+# Setting Environment Variables:
+#
+# 1. Command Line (temporary, current session only):
+#    export MINIO_ACCESS_KEY="minioadmin"
+#    export MINIO_SECRET_KEY="minioadmin"
+#
+# 2. .env File (recommended for development):
+#    Create a .env file in the project root:
+#    echo "MINIO_ACCESS_KEY=minioadmin" >> .env
+#    echo "MINIO_SECRET_KEY=minioadmin" >> .env
+#
+# 3. System Environment (permanent):
+#    Add to your shell profile (~/.bashrc, ~/.zshrc, etc.):
+#    export MINIO_ACCESS_KEY="your_access_key"
+#    export MINIO_SECRET_KEY="your_secret_key"
+#
+# 4. Docker Environment:
+#    docker run -e MINIO_ACCESS_KEY=minioadmin \
+#               -e MINIO_SECRET_KEY=minioadmin \
+#               your-pipeline-image
+#
+# 5. Kubernetes Secrets:
+#    kubectl create secret generic minio-credentials \
+#      --from-literal=access-key=minioadmin \
+#      --from-literal=secret-key=minioadmin
+#
+# Production Security Best Practices:
+# ==================================
+# 1. Use strong, unique credentials (32+ character access key, 64+ character secret)
+# 2. Enable SSL/TLS in production (use https:// endpoint)
+# 3. Use a secrets management system (AWS Secrets Manager, HashiCorp Vault, etc.)
+# 4. Rotate credentials regularly
+# 5. Use IAM roles when possible instead of static credentials
+# 6. Restrict network access to MinIO server
+# 7. Never commit .env files or credentials to version control

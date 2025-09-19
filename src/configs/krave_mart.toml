@@ -1,0 +1,137 @@
+[api]
+name = "krave_mart"
+base_url = "https://k2products.kravemart.com"
+auth_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2sycHJvZHVjdHMua3JhdmVtYXJ0LmNvbS9hcGkvbG9naW4iLCJpYXQiOjE3NTc5Mjc0NzUsImV4cCI6MTc1ODEwMDI3NSwibmJmIjoxNzU3OTI3NDc1LCJqdGkiOiI5NFU4NVVMRnRkVkNhVm1VIiwic3ViIjoiMiIsInBydiI6IjBiZjZjNzFmN2MzOWI4MWEyYzFiNzUxNjBjOWRhMmU1N2MyZmVkNjYifQ.M687M3d_SCSUzZR3lMsnZnDKdTMKjCCTbX_ZtPM4blM"
+
+[pagination]
+type = "page"
+page_param = "page"
+limit_param = "limit"
+default_limit = 100
+
+[fields]
+target_fields = ["cost_price", "mrp", "name", "sku_percent_off", "category_name"]
+
+[categories]
+# Fruits & Vegetables
+fruits_veg = { name = "Fruits & Vegetables", category_ids = "2417,2738,2418,2419,4355,2778,4119,2772,4538" }
+
+# New Arrival
+new_arrival = { name = "New Arrival", category_ids = "4660,4565,4767,4628,4528,4882,4858,4971" }
+
+# Flash Deals
+flash_deals = { name = "Flash Deals", category_ids = "2866,4946,4391,4708,3609,3272,4396,3793" }
+
+# Krave Bakery
+krave_bakery = { name = "Krave Bakery", category_ids = "4585,4744,4581,4580,4582,4583,4584" }
+
+# Chicken, Fish & Meat
+chicken_fish_meat = { name = "Chicken, Fish & Meat", category_ids = "4630,4483,4276,4279,4275,4278,4280,4277" }
+
+# Krave Discounts
+krave_discounts = { name = "Krave Discounts", category_ids = "3961,3962" }
+
+# Beverages
+beverages = { name = "Beverages", category_ids = "4502,4503,4908,4504,4505,4506,4507,2441,4330" }
+
+# Chips, Nimco & Dry Fruits
+chips_nimco_dry_fruits = { name = "Chips, Nimco & Dry Fruits", category_ids = "4493,4537,4494,4495,4496,2404,4741,2405" }
+
+# Ice Cream
+ice_cream = { name = "Ice Cream", category_ids = "3210,3209,3211,4532" }
+
+# Juices & Water
+juices_water = { name = "Juices & Water", category_ids = "2440,2442,2823,2443,4508" }
+
+# Biscuits & Wafers
+biscuits_wafers = { name = "Biscuits & Wafers", category_ids = "4395,4488,2403,4490,4491,5048" }
+
+# Chocolates, Desserts & Candies
+chocolates_desserts_candies = { name = "Chocolates, Desserts & Candies", category_ids = "2399,2400,2401,2393,2550,2515,2533,2385" }
+
+# Pan Ka Khoka
+pan_ka_khoka = { name = "Pan Ka Khoka", category_ids = "2448,2452,2822,2450,2449,2451,2356,4137" }
+
+# Sabse Sasta Rashan
+sabse_sasta_rashan = { name = "Sabse Sasta Rashan", category_ids = "3890,3891,3892,3893,3894,3900,3895,3896" }
+
+# Better for your Snacks
+better_snacks = { name = "Better for your Snacks", category_ids = "2407,4489,5090" }
+
+# Nashta
+nashta = { name = "Nashta", category_ids = "2409,2412,2411,2410,2629,2414,2415,2413,2416" }
+
+# Masalay
+masalay = { name = "Masalay", category_ids = "2397,2396,2384" }
+
+# Frozen Favourites
+frozen_favourites = { name = "Frozen Favourites", category_ids = "4288,4289,4285,4284,4283,4281,4282,4286,4287,4482,4778,4613" }
+
+# Ketchup, Sauces & Seasonings
+ketchup_sauces_seasonings = { name = "Ketchup, Sauces & Seasonings", category_ids = "2388,4356,4608,4609,4610,2391,4616,4617,2395" }
+
+# Noodles & Canned Foods
+noodles_canned_foods = { name = "Noodles & Canned Foods", category_ids = "4614,4514,4615,2392,2394,4611,4618" }
+
+# Milk, Cheese & Yogurt
+milk_cheese_yogurt = { name = "Milk, Cheese & Yogurt", category_ids = "2435,2438,2437,2436,2434,4776" }
+
+# Atta, Daal, Chaawal
+atta_daal_chaawal = { name = "Atta, Daal, Chaawal", category_ids = "2383,2381,2382,3109,2844" }
+
+# Oil & Ghee
+oil_ghee = { name = "Oil & Ghee", category_ids = "2378,2379,2380" }
+
+# Tea, Coffee & Sugar
+tea_coffee_sugar = { name = "Tea, Coffee & Sugar", category_ids = "2431,2386,2433,2432,2478,2430" }
+
+# Hair Care
+hair_care = { name = "Hair Care", category_ids = "2465,4623,4624,4625,4626,4627" }
+
+# Face & Skin Care
+face_skin_care = { name = "Face & Skin Care", category_ids = "4643,4641,4649,4640,4642,4644,4645,4646,2471,4647,4648" }
+
+# Feminine Care
+feminine_care = { name = "Feminine Care", category_ids = "2473,4636,4637,4638,4118" }
+
+# Bath & Body
+bath_body = { name = "Bath & Body", category_ids = "2460,2461,2459,2458,2463,4633,4634,4635" }
+
+# Makeup & Beauty
+makeup_beauty = { name = "Makeup & Beauty", category_ids = "2794,2796,2795,2793,4650,4651,4652,4813" }
+
+# Health & Wellness
+health_wellness = { name = "Health & Wellness", category_ids = "2474,2676,2481,2482,2722,2686,2475,2723,2479" }
+
+# Diapers & Pants
+diapers_pants = { name = "Diapers & Pants", category_ids = "4268,4270,4271,4272,4273,4274" }
+# Baby Food & Milk Formula
+baby_food_milk_formula = { name = "Baby Food & Milk Formula", category_ids = "2606,2605,2477" }
+
+# Baby Care Accessories
+baby_care_accessories = { name = "Baby Care Accessories", category_ids = "2456,5029,2539,2457,3358" }
+
+# Dollar Store
+dollar_store = { name = "Dollar Store", category_ids = "2608,2609,2817" }
+
+# Household Supplies
+household_supplies = { name = "Household Supplies", category_ids = "2423,2425,2426,2428,2537,2422,2427,2519" }
+
+# Laundry
+laundry = { name = "Laundry", category_ids = "2420,2421,4612,4536" }
+
+# Containers, Bottles & Jugs
+containers_bottles_jugs = { name = "Containers, Bottles & Jugs", category_ids = "4108,4106,4772,4105" }
+
+# Kitchen Supplies
+kitchen_supplies = { name = "Kitchen Supplies", category_ids = "2424,2819,2744,2429,2864,4399,2820,2821" }
+
+# Stationery
+stationery = { name = "Stationery", category_ids = "2556,2542,2543,2541,2544,2546,2577,2545" }
+
+# Lighting & Batteries
+lighting_batteries = { name = "Lighting & Batteries", category_ids = "3998,2501,2500,2499,2498" }
+
+# Pet Essentials
+pet_essentials = { name = "Pet Essentials", category_ids = "2485,2484" }
+

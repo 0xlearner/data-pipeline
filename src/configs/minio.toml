@@ -1,0 +1,40 @@
+# MinIO Storage Configuration
+[minio]
+# MinIO server endpoint (can be local or remote)
+endpoint = "http://localhost:9000"
+
+# Bucket name for storing data
+bucket_name = "data-pipeline"
+
+# AWS/MinIO region (optional, defaults to "us-east-1")
+region = "us-east-1"
+
+# Use path-style URLs (recommended for MinIO, optional, defaults to true)
+path_style = true
+
+# Use SSL/TLS connection (optional, auto-detected from endpoint if not specified)
+# ssl = false
+
+# Environment variable names for credentials (optional, uses defaults if not specified)
+# If you want to use custom environment variable names, uncomment and modify:
+# env_access_key = "MY_CUSTOM_MINIO_ACCESS_KEY"
+# env_secret_key = "MY_CUSTOM_MINIO_SECRET_KEY"
+
+# SECURITY NOTE:
+# Credentials are NOT stored in this file for security reasons.
+# Instead, set these environment variables:
+#
+# Default environment variables:
+#   MINIO_ACCESS_KEY=your_access_key_here
+#   MINIO_SECRET_KEY=your_secret_key_here
+#
+# You can set these in your shell:
+#   export MINIO_ACCESS_KEY="minioadmin"
+#   export MINIO_SECRET_KEY="minioadmin"
+#
+# Or create a .env file in your project root:
+#   echo "MINIO_ACCESS_KEY=minioadmin" >> .env
+#   echo "MINIO_SECRET_KEY=minioadmin" >> .env
+#
+# For production, use strong, unique credentials and consider using
+# a secrets management system.

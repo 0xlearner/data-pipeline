@@ -1,1 +1,16 @@
 /target
+.env
+Cargo.lock
+
+# Documentation and summary files
+docs/
+*.md
+CLEANUP_SUMMARY.md
+FINAL_DATA_CLEANING_SUMMARY.md
+
+# Scripts and setup files
+scripts/
+
+# API response data files
+krave_mart_api_response.json
+*.json
