@@ -31,6 +31,14 @@ path = "src/bin/test_data_cleaning.rs"
 name = "test_real_data_cleaning"
 path = "src/bin/test_real_data_cleaning.rs"
 
+[[bin]]
+name = "test_unified_pipeline"
+path = "src/bin/test_unified_pipeline.rs"
+
+[[bin]]
+name = "test_pagination_robustness"
+path = "src/bin/test_pagination_robustness.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 wreq = { version = "5", features = ["json"] }

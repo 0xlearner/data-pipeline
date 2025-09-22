@@ -3,6 +3,15 @@ name = "krave_mart"
 base_url = "https://k2products.kravemart.com"
 auth_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2sycHJvZHVjdHMua3JhdmVtYXJ0LmNvbS9hcGkvbG9naW4iLCJpYXQiOjE3NTc5Mjc0NzUsImV4cCI6MTc1ODEwMDI3NSwibmJmIjoxNzU3OTI3NDc1LCJqdGkiOiI5NFU4NVVMRnRkVkNhVm1VIiwic3ViIjoiMiIsInBydiI6IjBiZjZjNzFmN2MzOWI4MWEyYzFiNzUxNjBjOWRhMmU1N2MyZmVkNjYifQ.M687M3d_SCSUzZR3lMsnZnDKdTMKjCCTbX_ZtPM4blM"
 
+[request]
+method = "GET"
+authorization = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2sycHJvZHVjdHMua3JhdmVtYXJ0LmNvbS9hcGkvbG9naW4iLCJpYXQiOjE3NTc5Mjc0NzUsImV4cCI6MTc1ODEwMDI3NSwibmJmIjoxNzU3OTI3NDc1LCJqdGkiOiI5NFU4NVVMRnRkVkNhVm1VIiwic3ViIjoiMiIsInBydiI6IjBiZjZjNzFmN2MzOWI4MWEyYzFiNzUxNjBjOWRhMmU1N2MyZmVkNjYifQ.M687M3d_SCSUzZR3lMsnZnDKdTMKjCCTbX_ZtPM4blM"
+
+[request.headers]
+
+[response]
+data_path = "data[].krave_mart_products[]"
+
 [pagination]
 type = "page"
 page_param = "page"

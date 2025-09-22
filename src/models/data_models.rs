@@ -9,6 +9,93 @@ pub struct Product {
     pub category_name: String,
 }
 
+// BazaarApp specific models
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BazaarAppProduct {
+    #[serde(rename = "variantTitleSlug")]
+    pub variant_title_slug: String,
+    pub id: String,
+    pub title: String,
+    pub vendor: String,
+    #[serde(rename = "variantId")]
+    pub variant_id: String,
+    pub sku: String,
+    pub description: String,
+    #[serde(rename = "actualPrice")]
+    pub actual_price: u32,
+    #[serde(rename = "discountedPrice")]
+    pub discounted_price: u32,
+    #[serde(rename = "retailPrice")]
+    pub retail_price: u32,
+    #[serde(rename = "uomSale")]
+    pub uom_sale: String,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
+    #[serde(rename = "brandId")]
+    pub brand_id: String,
+    #[serde(rename = "inventoryWarehouseId")]
+    pub inventory_warehouse_id: String,
+    #[serde(rename = "availableStock")]
+    pub available_stock: u32,
+    #[serde(rename = "inventoryStatus")]
+    pub inventory_status: String,
+    pub category: String,
+    #[serde(rename = "categoryId")]
+    pub category_id: String,
+    #[serde(rename = "promoId")]
+    pub promo_id: String,
+    #[serde(rename = "cartonSize")]
+    pub carton_size: u32,
+    #[serde(rename = "perBundleTotalQuantity")]
+    pub per_bundle_total_quantity: u32,
+    pub tag: String,
+    #[serde(rename = "mediaGallery")]
+    pub media_gallery: Vec<MediaGalleryItem>,
+    #[serde(rename = "categoryStatus")]
+    pub category_status: bool,
+    #[serde(rename = "variantZoneId")]
+    pub variant_zone_id: String,
+    #[serde(rename = "productRatingScore")]
+    pub product_rating_score: f64,
+    #[serde(rename = "productRatingCount")]
+    pub product_rating_count: u32,
+    #[serde(rename = "coreCategoryId")]
+    pub core_category_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MediaGalleryItem {
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
+    #[serde(rename = "sortingOrder")]
+    pub sorting_order: u32,
+}
+
+// BazaarApp POST request models
+#[allow(dead_code)]
+#[derive(Serialize, Debug)]
+pub struct PaginationRequestDTO {
+    pub page: i32,
+    pub size: i32,
+}
+
+#[allow(dead_code)]
+#[derive(Serialize, Debug)]
+pub struct BazaarAppProductRequest {
+    #[serde(rename = "productChannel")]
+    pub product_channel: String,
+    #[serde(rename = "paginationRequestDTO")]
+    pub pagination_request_dto: PaginationRequestDTO,
+    #[serde(rename = "searchKey")]
+    pub search_key: String,
+    #[serde(rename = "brandIds")]
+    pub brand_ids: Vec<String>,
+    #[serde(rename = "coreCategorySlug")]
+    pub core_category_slug: String,
+    #[serde(rename = "subcategorySlugs")]
+    pub subcategory_slugs: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RawApiResponse {
     pub data: Vec<ApiResponseData>,

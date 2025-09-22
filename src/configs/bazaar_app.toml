@@ -1,0 +1,53 @@
+[api]
+name = "bazaar_app"
+base_url = "https://www.bazaarapp.com"
+auth_token = ""
+
+[request]
+method = "POST"
+endpoint = "/api/products/core-category"
+product_channel = "WEB_APP"
+category_field = "coreCategorySlug"
+page_size = 20
+
+[request.headers]
+
+[response]
+# BazaarApp returns products directly as an array
+
+[pagination]
+type = "post_body"
+page_param = "page"
+limit_param = "size"
+default_limit = 20
+
+[fields]
+target_fields = ["variantTitleSlug", "actualPrice", "discountedPrice", "category", "sku"]
+
+# Core categories from bazaarapp.txt
+[categories]
+baby_care = { name = "Baby Care", core_category_slug = "baby-care" }
+beverages = { name = "Beverages", core_category_slug = "beverages" }
+breakfast = { name = "Breakfast", core_category_slug = "breakfast" }
+chicken_meat = { name = "Chicken & Meat", core_category_slug = "chicken-meat" }
+cleaning_homecare = { name = "Cleaning & Homecare", core_category_slug = "cleaning-homecare" }
+dessert_baking = { name = "Dessert & Baking Essentials", core_category_slug = "dessert-baking-essentials" }
+flour = { name = "Flour", core_category_slug = "flour" }
+frozen = { name = "Frozen", core_category_slug = "frozen" }
+fruits_vegetables = { name = "Fruits & Vegetables", core_category_slug = "fruits-vegetables" }
+hair_care = { name = "Hair Care", core_category_slug = "hair-care" }
+jar_canned = { name = "Jar & Canned Foods", core_category_slug = "jar-canned-foods" }
+laundry = { name = "Laundry", core_category_slug = "laundry" }
+milk_dairy = { name = "Milk & Dairy", core_category_slug = "milk-dairy" }
+oil_ghee = { name = "Oil & Ghee", core_category_slug = "oil-ghee" }
+pasta_noodles = { name = "Pasta & Noodles", core_category_slug = "pasta-noodles" }
+personal_care = { name = "Personal Care", core_category_slug = "personal-care" }
+pet_care = { name = "Pet Care", core_category_slug = "pet-care" }
+pulses = { name = "Pulses", core_category_slug = "pulses" }
+rice = { name = "Rice", core_category_slug = "rice" }
+snacks = { name = "Snacks", core_category_slug = "snacks" }
+soaps_handwashes = { name = "Soaps & Handwashes", core_category_slug = "soaps-handwashes" }
+spices_condiments = { name = "Spices & Condiments", core_category_slug = "spices-condiments" }
+sugar = { name = "Sugar", core_category_slug = "sugar" }
+tea_coffee = { name = "Tea & Coffee", core_category_slug = "tea-coffee" }
+tissues = { name = "Tissues", core_category_slug = "tissues" }

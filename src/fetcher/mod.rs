@@ -1,3 +1,3 @@
-pub mod http_fetcher;
+pub mod unified_fetcher;
 
-pub use http_fetcher::HttpFetcher;
+pub use unified_fetcher::UnifiedFetcher;

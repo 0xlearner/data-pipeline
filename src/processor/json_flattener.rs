@@ -70,65 +70,116 @@ impl JsonFlattener {
             })
         };
 
-        // Extract required fields with fallbacks
-        let product_id = item
-            .get("product_id")
-            .and_then(|v| v.as_u64())
-            .ok_or_else(|| anyhow!("Missing or invalid product_id"))?;
+        // Extract identifier - try multiple field names
+        let identifier = if let Some(product_id) = item.get("product_id").and_then(|v| v.as_u64()) {
+            Some(product_id.to_string())
+        } else {
+            let sku = get_string("sku");
+            if !sku.is_empty() {
+                Some(sku)
+            } else {
+                let id = get_string("id");
+                if !id.is_empty() {
+                    Some(id)
+                } else {
+                    let variant = get_string("variantTitleSlug");
+                    if !variant.is_empty() {
+                        Some(variant)
+                    } else {
+                        None
+                    }
+                }
+            }
+        };
 
-        let name = get_string("name");
-        if name.is_empty() {
-            return Err(anyhow!("Missing or empty name field"));
+        if let Some(ref id) = identifier {
+            record.insert("product_id".to_string(), id.clone());
         }
 
-        // Extract cost_price with fallback to special_price
+        // Extract name - try multiple field names
+        let name = {
+            let n = get_string("name");
+            if !n.is_empty() {
+                n
+            } else {
+                let n = get_string("title");
+                if !n.is_empty() {
+                    n
+                } else {
+                    get_string("productName")
+                }
+            }
+        };
+
+        if !name.is_empty() {
+            record.insert("name".to_string(), name);
+        }
+
+        // Extract cost_price with multiple fallbacks
         let cost_price = get_number("cost_price")
-            .or_else(|| get_number("special_price"));
+            .or_else(|| get_number("special_price"))
+            .or_else(|| get_number("discountedPrice"))
+            .or_else(|| get_number("discounted_price"));
         if let Some(cost_price) = cost_price {
             record.insert("cost_price".to_string(), cost_price);
         }
 
-        // Extract mrp with fallback to product_price
+        // Extract mrp with multiple fallbacks
         let mrp = get_number("mrp")
-            .or_else(|| get_number("product_price"));
+            .or_else(|| get_number("product_price"))
+            .or_else(|| get_number("actualPrice"))
+            .or_else(|| get_number("actual_price"));
         if let Some(mrp) = mrp {
             record.insert("mrp".to_string(), mrp);
         }
 
-        // Extract name
-        record.insert("name".to_string(), name);
 
-        // Extract sku with fallback to product_id
-        let sku = item
-            .get("sku")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("PRODUCT_{}", product_id));
-        record.insert("sku".to_string(), sku);
 
-        // Extract product_id
-        record.insert("product_id".to_string(), product_id.to_string());
+        // Extract sku with fallback to identifier
+        let sku = get_string("sku");
+        if !sku.is_empty() {
+            record.insert("sku".to_string(), sku);
+        } else if let Some(ref id) = identifier {
+            record.insert("sku".to_string(), format!("SKU_{}", id));
+        }
 
-        // Extract sku_percent_off
-        let sku_percent_off = get_string("sku_percent_off");
-        record.insert("sku_percent_off".to_string(), sku_percent_off);
+        // Extract discount percentage with multiple fallbacks
+        let discount = get_number("sku_percent_off")
+            .or_else(|| get_number("discount_percentage"))
+            .or_else(|| get_number("discountPercentage"));
+        if let Some(discount) = discount {
+            record.insert("sku_percent_off".to_string(), discount);
+        }
 
-        // Extract category names
-        let category_names =
-            if let Some(categories) = item.get("categories").and_then(|v| v.as_array()) {
-                let names: Vec<String> = categories
-                    .iter()
-                    .filter_map(|cat| {
-                        cat.get("category_name")
-                            .and_then(|name| name.as_str())
-                            .map(|s| s.trim().to_lowercase())
-                    })
-                    .collect();
-                names.join(", ")
+        // Extract category names with multiple fallbacks
+        let category_names = if let Some(categories) = item.get("categories").and_then(|v| v.as_array()) {
+            let names: Vec<String> = categories
+                .iter()
+                .filter_map(|cat| {
+                    cat.get("category_name")
+                        .and_then(|name| name.as_str())
+                        .map(|s| s.trim().to_lowercase())
+                })
+                .collect();
+            names.join(", ")
+        } else {
+            // Try direct category field
+            let cat = get_string("category");
+            if !cat.is_empty() {
+                cat
             } else {
-                String::new()
-            };
-        record.insert("category_name".to_string(), category_names);
+                let cat = get_string("categoryName");
+                if !cat.is_empty() {
+                    cat
+                } else {
+                    get_string("category_name")
+                }
+            }
+        };
+
+        if !category_names.is_empty() {
+            record.insert("category_name".to_string(), category_names);
+        }
 
         Ok(record)
     }

@@ -13,4 +13,9 @@ scripts/
 
 # API response data files
 krave_mart_api_response.json
+bazaar_app_response.json
+bazaar_app_sample_product.json
+bazaar_app_processed_products.csv
 *.json
+*.csv
+*.txt

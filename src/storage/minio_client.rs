@@ -180,7 +180,6 @@ impl MinioStorage {
         Ok(object_names)
     }
 
-    #[allow(dead_code)]
     pub async fn get_object(&self, object_name: &str) -> Result<Vec<u8>> {
         let response = self.bucket.get_object(object_name).await?;
 
@@ -192,6 +191,53 @@ impl MinioStorage {
                 response.status_code()
             ))
         }
+    }
+
+    /// Get raw JSON data as string from S3/MinIO
+    pub async fn get_raw_json(&self, object_name: &str) -> Result<String> {
+        let bytes = self.get_object(object_name).await?;
+        let json_str = String::from_utf8(bytes)
+            .map_err(|e| anyhow!("Failed to parse JSON as UTF-8: {}", e))?;
+        Ok(json_str)
+    }
+
+    /// List all raw JSON files for a specific API source
+    pub async fn list_raw_files(&self, api_name: &str) -> Result<Vec<String>> {
+        // List all objects and filter for raw files of this API
+        let list = self.bucket.list("".to_string(), None).await?;
+
+        let mut raw_files = Vec::new();
+        for result in list {
+            for object in result.contents {
+                // Check if this is a raw JSON file for the specified API
+                if object.key.contains(&format!("raw/{}/", api_name)) && object.key.ends_with(".json") {
+                    raw_files.push(object.key);
+                }
+            }
+        }
+
+        // Sort by modification time (most recent first)
+        raw_files.sort_by(|a, b| b.cmp(a));
+        Ok(raw_files)
+    }
+
+    /// Get the most recent raw JSON file for a specific API source
+    pub async fn get_latest_raw_file(&self, api_name: &str) -> Result<Option<String>> {
+        let raw_files = self.list_raw_files(api_name).await?;
+        Ok(raw_files.into_iter().next())
+    }
+
+    /// Load and parse raw JSON data from the most recent file for an API source
+    pub async fn load_latest_raw_data(&self, api_name: &str) -> Result<Vec<serde_json::Value>> {
+        let latest_file = self.get_latest_raw_file(api_name).await?
+            .ok_or_else(|| anyhow!("No raw data files found for API: {}", api_name))?;
+
+        info!("Loading raw data from: {}", latest_file);
+        let json_str = self.get_raw_json(&latest_file).await?;
+        let data: Vec<serde_json::Value> = serde_json::from_str(&json_str)
+            .map_err(|e| anyhow!("Failed to parse JSON data: {}", e))?;
+
+        Ok(data)
     }
 
     #[allow(dead_code)]
