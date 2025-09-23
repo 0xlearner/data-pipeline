@@ -50,6 +50,76 @@ impl JsonFlattener {
         self.records_to_dataframe(records)
     }
 
+    /// Process JSON data in batches and return a combined DataFrame
+    /// This is more memory efficient for large datasets
+    pub fn flatten_to_dataframe_batched(
+        &self,
+        batches: impl Iterator<Item = Result<Vec<Value>>>
+    ) -> Result<DataFrame> {
+        let mut all_dataframes = Vec::new();
+        let mut total_successful = 0;
+        let mut total_failed = 0;
+        let mut batch_count = 0;
+
+        for batch_result in batches {
+            let batch = batch_result?;
+            batch_count += 1;
+
+            info!("Processing batch {} with {} items", batch_count, batch.len());
+
+            let mut records = Vec::new();
+            let mut successful_count = 0;
+            let mut failed_count = 0;
+
+            for (index, item) in batch.iter().enumerate() {
+                match self.extract_fields_directly(item) {
+                    Ok(record) => {
+                        records.push(record);
+                        successful_count += 1;
+                    }
+                    Err(e) => {
+                        failed_count += 1;
+                        warn!(
+                            "Failed to extract fields from product at batch {} index {}: {}",
+                            batch_count, index, e
+                        );
+                    }
+                }
+            }
+
+            total_successful += successful_count;
+            total_failed += failed_count;
+
+            if !records.is_empty() {
+                let batch_df = self.records_to_dataframe(records)?;
+                all_dataframes.push(batch_df);
+                info!("Batch {} processed: {} successful, {} failed",
+                      batch_count, successful_count, failed_count);
+            }
+        }
+
+        info!(
+            "Batched processing complete: {} total successful, {} total failed across {} batches",
+            total_successful, total_failed, batch_count
+        );
+
+        // Combine all DataFrames
+        if all_dataframes.is_empty() {
+            Ok(DataFrame::empty())
+        } else if all_dataframes.len() == 1 {
+            Ok(all_dataframes.into_iter().next().unwrap())
+        } else {
+            // Concatenate all DataFrames
+            let mut iter = all_dataframes.into_iter();
+            let mut combined = iter.next().unwrap();
+            for df in iter {
+                combined = combined.vstack(&df)
+                    .map_err(|e| anyhow!("Failed to combine DataFrames: {}", e))?;
+            }
+            Ok(combined)
+        }
+    }
+
     pub fn extract_fields_directly(&self, item: &Value) -> Result<HashMap<String, String>> {
         let mut record = HashMap::new();
 
@@ -119,7 +189,16 @@ impl JsonFlattener {
         let cost_price = get_number("cost_price")
             .or_else(|| get_number("special_price"))
             .or_else(|| get_number("discountedPrice"))
-            .or_else(|| get_number("discounted_price"));
+            .or_else(|| get_number("discounted_price"))
+            // Dealcart: Extract from groupRanges[0].discountedPrice
+            .or_else(|| {
+                item.get("groupRanges")
+                    .and_then(|ranges| ranges.as_array())
+                    .and_then(|arr| arr.first())
+                    .and_then(|first_range| first_range.get("discountedPrice"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            });
         if let Some(cost_price) = cost_price {
             record.insert("cost_price".to_string(), cost_price);
         }
@@ -128,7 +207,16 @@ impl JsonFlattener {
         let mrp = get_number("mrp")
             .or_else(|| get_number("product_price"))
             .or_else(|| get_number("actualPrice"))
-            .or_else(|| get_number("actual_price"));
+            .or_else(|| get_number("actual_price"))
+            // Dealcart: Extract from inventories[0].dcImsMrp
+            .or_else(|| {
+                item.get("inventories")
+                    .and_then(|inventories| inventories.as_array())
+                    .and_then(|arr| arr.first())
+                    .and_then(|first_inventory| first_inventory.get("dcImsMrp"))
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n.to_string())
+            });
         if let Some(mrp) = mrp {
             record.insert("mrp".to_string(), mrp);
         }
@@ -159,6 +247,18 @@ impl JsonFlattener {
                     cat.get("category_name")
                         .and_then(|name| name.as_str())
                         .map(|s| s.trim().to_lowercase())
+                })
+                .collect();
+            names.join(", ")
+        } else if let Some(product_categories) = item.get("productCategory").and_then(|v| v.as_array()) {
+            // Dealcart: Extract from productCategory array
+            let names: Vec<String> = product_categories
+                .iter()
+                .filter_map(|cat| {
+                    cat.get("category")
+                        .and_then(|category| category.get("name"))
+                        .and_then(|name| name.as_str())
+                        .map(|s| s.trim().to_string())
                 })
                 .collect();
             names.join(", ")

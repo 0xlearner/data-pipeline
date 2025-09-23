@@ -240,6 +240,46 @@ impl MinioStorage {
         Ok(data)
     }
 
+    /// Stream raw JSON data in batches from the most recent file for an API source
+    /// This is memory-efficient for large datasets
+    pub async fn stream_latest_raw_data_batched(
+        &self,
+        api_name: &str,
+        batch_size: usize
+    ) -> Result<impl Iterator<Item = Result<Vec<serde_json::Value>>>> {
+        let latest_file = self.get_latest_raw_file(api_name).await?
+            .ok_or_else(|| anyhow!("No raw data files found for API: {}", api_name))?;
+
+        info!("Streaming raw data in batches of {} from: {}", batch_size, latest_file);
+        let json_str = self.get_raw_json(&latest_file).await?;
+
+        // Parse the entire JSON array first (we need to do this to get individual items)
+        let data: Vec<serde_json::Value> = serde_json::from_str(&json_str)
+            .map_err(|e| anyhow!("Failed to parse JSON data: {}", e))?;
+
+        info!("Total items to process: {}, batch size: {}", data.len(), batch_size);
+
+        // Create an iterator that yields batches
+        let batches = data.chunks(batch_size)
+            .map(|chunk| Ok(chunk.to_vec()))
+            .collect::<Vec<_>>();
+
+        Ok(batches.into_iter())
+    }
+
+    /// Get metadata about the latest raw data file without loading it
+    pub async fn get_latest_raw_data_info(&self, api_name: &str) -> Result<(String, usize)> {
+        let latest_file = self.get_latest_raw_file(api_name).await?
+            .ok_or_else(|| anyhow!("No raw data files found for API: {}", api_name))?;
+
+        // Get file size by loading just the JSON structure
+        let json_str = self.get_raw_json(&latest_file).await?;
+        let data: Vec<serde_json::Value> = serde_json::from_str(&json_str)
+            .map_err(|e| anyhow!("Failed to parse JSON data: {}", e))?;
+
+        Ok((latest_file, data.len()))
+    }
+
     #[allow(dead_code)]
     pub async fn delete_object(&self, object_name: &str) -> Result<()> {
         let response = self.bucket.delete_object(object_name).await?;

@@ -30,15 +30,28 @@ impl UnifiedFetcher {
                 let category_urls = self.config.build_category_urls();
                 for (category_key, url) in category_urls {
                     info!("Fetching GET category: {}", category_key);
-                    match self.fetch_get_paginated(&url).await {
-                        Ok(data) => {
-                            info!("Fetched {} products from {}", data.len(), category_key);
-                            all_data.extend(data);
+
+                    // Check if pagination is disabled
+                    let data = if self.config.pagination.r#type == "none" {
+                        match self.fetch_get_single(&url).await {
+                            Ok(data) => data,
+                            Err(e) => {
+                                error!("Failed to fetch category {}: {}", category_key, e);
+                                continue;
+                            }
                         }
-                        Err(e) => {
-                            error!("Failed to fetch category {}: {}", category_key, e);
+                    } else {
+                        match self.fetch_get_paginated(&url).await {
+                            Ok(data) => data,
+                            Err(e) => {
+                                error!("Failed to fetch category {}: {}", category_key, e);
+                                continue;
+                            }
                         }
-                    }
+                    };
+
+                    info!("Fetched {} products from {}", data.len(), category_key);
+                    all_data.extend(data);
                 }
             }
             "POST" => {
@@ -62,6 +75,32 @@ impl UnifiedFetcher {
         }
         
         Ok(all_data)
+    }
+    
+    // Method for single GET requests (no pagination)
+    pub async fn fetch_get_single(&self, url: &str) -> Result<Vec<Value>> {
+        info!("Fetching single GET request from: {}", url);
+
+        // Handle potential API errors gracefully
+        let response = match self.fetch_with_get(url).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(anyhow!("Failed to fetch from {}: {}", url, e));
+            }
+        };
+
+        // Parse JSON response
+        let data: Value = match response.json().await {
+            Ok(json) => json,
+            Err(e) => {
+                return Err(anyhow!("Failed to parse JSON response from {}: {}", url, e));
+            }
+        };
+
+        let products = self.extract_products(&data)?;
+        info!("Found {} products in single request", products.len());
+
+        Ok(products)
     }
 
     pub async fn fetch_get_paginated(&self, url: &str) -> Result<Vec<Value>> {

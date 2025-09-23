@@ -1,0 +1,88 @@
+[api]
+name = "dealcart"
+base_url = "https://api.dealcart.io"
+auth_token = ""
+
+[request]
+method = "GET"
+endpoint = "/api/consumer/products/pricing-with-variant"
+
+[request.headers]
+
+[response]
+data_path = "body.results"
+
+[pagination]
+type = "none"
+limit_param = "limit"
+default_limit = 2000
+
+[fields]
+target_fields = ["id", "name", "productCategory", "dcImsMrp", "discountedPrice"]
+
+[categories]
+# Fruits & Vegetables
+fruits_vegetables = { name = "Fruits & Vegetables", category_id = "18" }
+
+# Baby care
+baby_care = { name = "Baby Care", category_id = "8" }
+
+# Skin care
+skin_care = { name = "Skin Care", category_id = "1574" }
+
+# Breakfast
+breakfast = { name = "Breakfast", category_id = "318" }
+
+# Frozen Essentials
+frozen_essentials = { name = "Frozen Essentials", category_id = "1800" }
+
+# Dairy
+dairy = { name = "Dairy", category_id = "14" }
+
+# Snacks
+snacks = { name = "Snacks", category_id = "23" }
+
+# Noodles & Sauces
+noodles_sauces = { name = "Noodles & Sauces", category_id = "61" }
+
+# Cleaning & Laundry
+cleaning_laundry = { name = "Cleaning & Laundry", category_id = "5" }
+
+# Spices & Seasoning
+spices_seasoning = { name = "Spices & Seasoning", category_id = "58" }
+
+# Staples
+staples = { name = "Staples", category_id = "17" }
+
+# Meat
+meat = { name = "Meat", category_id = "1818" }
+
+# Beverages
+beverages = { name = "Beverages", category_id = "67" }
+
+# Oil & Ghee
+oil_ghee = { name = "Oil & Ghee", category_id = "16" }
+
+# Ice Cream
+ice_cream = { name = "Ice Cream", category_id = "1983" }
+
+# Tea & Coffee
+tea_coffee = { name = "Tea & Coffee", category_id = "20" }
+
+# Personal Care
+personal_care = { name = "Personal Care", category_id = "29" }
+
+# Household Supplies
+household_supplies = { name = "Household Supplies", category_id = "4" }
+
+# Baking & Desserts
+baking_desserts = { name = "Baking & Desserts", category_id = "1584" }
+
+# Dry Fruits
+dry_fruits = { name = "Dry Fruits", category_id = "361" }
+
+# Bath & Body
+bath_body = { name = "Bath & Body", category_id = "1600" }
+
+# Hair Care
+hair_care = { name = "Hair Care", category_id = "391" }

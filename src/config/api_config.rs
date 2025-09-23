@@ -35,6 +35,7 @@ pub struct FieldConfig {
 pub struct CategoryConfig {
     pub name: String,
     pub category_ids: Option<String>,
+    pub category_id: Option<String>,
     pub core_category_slug: Option<String>,
 }
 
@@ -66,11 +67,24 @@ impl ApiConfig {
 
         for (key, category) in &self.categories {
             if let Some(ref category_ids) = category.category_ids {
+                // KraveMart pattern: multiple category IDs
                 let url = format!(
                     "{}/api/v2/es/categories/{}/products/1242164",
                     self.api.base_url, category_ids
                 );
                 urls.push((key.clone(), url));
+            } else if let Some(ref category_id) = category.category_id {
+                // Dealcart pattern: single category ID with endpoint and query params
+                if let Some(ref endpoint) = self.request.endpoint {
+                    let url = format!(
+                        "{}{}?warehouse_id=1&limit={}&category_id={}",
+                        self.api.base_url,
+                        endpoint,
+                        self.pagination.default_limit.unwrap_or(2000),
+                        category_id
+                    );
+                    urls.push((key.clone(), url));
+                }
             }
         }
 

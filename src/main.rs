@@ -37,6 +37,7 @@ async fn main() -> Result<()> {
     let sources = vec![
         ("krave_mart", "src/configs/krave_mart.toml"),
         ("bazaar_app", "src/configs/bazaar_app.toml"),
+        ("dealcart", "src/configs/dealcart.toml"),
     ];
 
     // Load MinIO configuration (shared across all sources)
@@ -173,20 +174,47 @@ async fn process_single_source(
 
     // Load raw data back from S3 for processing (ensuring consistency)
     info!("Loading raw data from S3 for processing");
-    let raw_data_from_storage = storage.load_latest_raw_data(&api_config.api.name).await
-        .with_context(|| format!("Failed to load raw data back from S3 for {}", api_config.api.name))?;
 
-    // Process data through pipeline using S3-sourced data
-    info!("Processing {} products through pipeline (from S3)", raw_data_from_storage.len());
-    let mut df = flattener.flatten_to_dataframe(&raw_data_from_storage)?;
+    // Get metadata first to determine processing approach
+    let (file_path, total_products) = storage.get_latest_raw_data_info(&api_config.api.name).await
+        .with_context(|| format!("Failed to get raw data info for {} from storage", api_config.api.name))?;
+
+    info!("Found {} products in {} for processing", total_products, file_path);
+
+    // Determine batch size based on dataset size
+    let batch_size = if total_products > 50000 {
+        5000  // Large datasets: 5K per batch
+    } else if total_products > 10000 {
+        2000  // Medium datasets: 2K per batch
+    } else {
+        total_products  // Small datasets: process all at once
+    };
+
+    info!("Processing {} products in batches of {} for memory efficiency", total_products, batch_size);
+
+    let df = if batch_size >= total_products {
+        // Small dataset - use original method
+        info!("Using standard processing for small dataset");
+        let raw_data_from_storage = storage.load_latest_raw_data(&api_config.api.name).await?;
+        flattener.flatten_to_dataframe(&raw_data_from_storage)?
+    } else {
+        // Large dataset - use batched processing
+        info!("Using batched processing for large dataset");
+        let batches = storage.stream_latest_raw_data_batched(&api_config.api.name, batch_size).await?;
+        flattener.flatten_to_dataframe_batched(batches)?
+    };
+
     info!("Flattened to DataFrame with {} rows", df.height());
 
+    // Apply processing pipeline
+    let mut processed_df = df;
+
     // Apply ML classification
-    classifier.map_to_canonical_schema(&mut df)?;
+    classifier.map_to_canonical_schema(&mut processed_df)?;
     info!("Applied field classification");
 
     // Apply rule-based normalization
-    normalizer.normalize_dataframe(&mut df)?;
+    normalizer.normalize_dataframe(&mut processed_df)?;
     info!("Applied normalization rules");
 
     // Convert to Parquet
@@ -194,7 +222,7 @@ async fn process_single_source(
     let mut buf = Vec::new();
     {
         let writer = ParquetWriter::new(&mut buf);
-        writer.finish(&mut df)?;
+        writer.finish(&mut processed_df)?;
     }
 
     // Store processed data
@@ -213,29 +241,51 @@ async fn process_source_from_storage(
 ) -> Result<usize> {
     info!("Loading raw data from storage for {}", source_name);
 
-    // Load raw data from S3/MinIO storage
-    let raw_data = storage.load_latest_raw_data(source_name).await
-        .with_context(|| format!("Failed to load raw data for {} from storage", source_name))?;
+    // Get metadata first to determine if we need batching
+    let (file_path, total_products) = storage.get_latest_raw_data_info(source_name).await
+        .with_context(|| format!("Failed to get raw data info for {} from storage", source_name))?;
 
-    let products_count = raw_data.len();
-    info!("Loaded {} products from storage for {}", products_count, source_name);
+    info!("Found {} products in {} for processing", total_products, file_path);
 
-    if products_count == 0 {
+    if total_products == 0 {
         warn!("No products found in storage for {}", source_name);
         return Ok(0);
     }
 
-    // Process data through pipeline
-    info!("Processing {} products through pipeline", products_count);
-    let mut df = flattener.flatten_to_dataframe(&raw_data)?;
+    // Determine batch size based on dataset size
+    let batch_size = if total_products > 50000 {
+        5000  // Large datasets: 5K per batch
+    } else if total_products > 10000 {
+        2000  // Medium datasets: 2K per batch
+    } else {
+        total_products  // Small datasets: process all at once
+    };
+
+    info!("Processing {} products in batches of {} for memory efficiency", total_products, batch_size);
+
+    let df = if batch_size >= total_products {
+        // Small dataset - use original method
+        info!("Using standard processing for small dataset");
+        let raw_data = storage.load_latest_raw_data(source_name).await?;
+        flattener.flatten_to_dataframe(&raw_data)?
+    } else {
+        // Large dataset - use batched processing
+        info!("Using batched processing for large dataset");
+        let batches = storage.stream_latest_raw_data_batched(source_name, batch_size).await?;
+        flattener.flatten_to_dataframe_batched(batches)?
+    };
+
     info!("Flattened to DataFrame with {} rows", df.height());
 
+    // Apply processing pipeline
+    let mut processed_df = df;
+
     // Apply ML classification
-    classifier.map_to_canonical_schema(&mut df)?;
+    classifier.map_to_canonical_schema(&mut processed_df)?;
     info!("Applied field classification");
 
     // Apply rule-based normalization
-    normalizer.normalize_dataframe(&mut df)?;
+    normalizer.normalize_dataframe(&mut processed_df)?;
     info!("Applied normalization rules");
 
     // Convert to Parquet
@@ -243,12 +293,12 @@ async fn process_source_from_storage(
     let mut buf = Vec::new();
     {
         let writer = ParquetWriter::new(&mut buf);
-        writer.finish(&mut df)?;
+        writer.finish(&mut processed_df)?;
     }
 
     // Store processed data with storage suffix to distinguish from API-sourced data
     let processed_key = storage.store_parquet(&format!("{}_from_storage", source_name), &buf).await?;
     info!("Stored processed data at: {}", processed_key);
 
-    Ok(products_count)
+    Ok(total_products)
 }

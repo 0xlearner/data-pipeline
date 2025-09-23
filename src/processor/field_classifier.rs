@@ -17,6 +17,12 @@ impl FieldClassifier {
         field_mappings.insert("sku_percent_off".to_string(), "discount".to_string());
         field_mappings.insert("category_name".to_string(), "category".to_string());
 
+        // Dealcart-specific field mappings
+        field_mappings.insert("id".to_string(), "product_id".to_string());
+        field_mappings.insert("dcImsMrp".to_string(), "mrp".to_string());
+        field_mappings.insert("discountedPrice".to_string(), "cost_price".to_string());
+        field_mappings.insert("productCategory".to_string(), "category".to_string());
+
         // Add common variations
         field_mappings.insert("price".to_string(), "cost_price".to_string());
         field_mappings.insert("product_price".to_string(), "mrp".to_string());
