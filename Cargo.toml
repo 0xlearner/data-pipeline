@@ -63,3 +63,7 @@ config = "0.15.16"
 async-trait = "0.1"
 futures = "0.3"
 dotenv = "0.15"
+# HTML processing dependencies
+scraper = "0.20"
+smartcore = "0.3"
+rand = "0.8"

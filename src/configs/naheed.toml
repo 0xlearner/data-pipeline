@@ -1,0 +1,202 @@
+# Naheed Store Configuration
+# HTML-based web scraping configuration for Naheed.pk
+
+[site]
+name = "Naheed Store"
+base_url = "https://www.naheed.pk"
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+[scraping]
+delay_between_requests_ms = 2000
+max_pages_per_category = 5
+max_retries = 3
+timeout_seconds = 30
+respect_robots_txt = true
+
+[selectors]
+# Product container selectors - need to find the parent containers that contain both name and price
+product_selectors = [
+    ".product-item-info",
+    ".product-item",
+    ".product-card",
+    ".item",
+    ".product",
+    ".grid-item",
+    "li[class*='item']",
+    "div[class*='product']",
+    "article[class*='product']"
+]
+
+# Product name selectors - comprehensive list to find product names
+name_selectors = [
+    ".product-name",
+    ".product-item-name",
+    ".item-title",
+    ".product-title",
+    "h3",
+    "h4",
+    "h2",
+    ".title",
+    "strong",
+    "a[title]",
+    ".name",
+    "[class*='name']",
+    "[class*='title']"
+]
+
+# Price selectors (based on your sample: data-price-amount attribute)
+price_selectors = [
+    "[data-price-amount]",
+    ".price",
+    ".cost",
+    ".amount",
+    "[class*='price']",
+    ".product-price",
+    "span[class*='rs']"
+]
+
+# Category selectors (based on your sample: span.base with data-ui-id)
+category_selectors = [
+    "span.base[data-ui-id='page-title-wrapper']",
+    ".page-title",
+    ".breadcrumb",
+    "h1",
+    ".category-title"
+]
+
+pagination_selectors = [
+    ".pagination",
+    ".pager",
+    ".page-numbers"
+]
+
+# Categories to scrape
+[categories.fresh_fruits]
+name = "Fresh Fruits"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/fruits"
+enabled = true
+
+[categories.vegetables]
+name = "Fresh Vegetables"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/vegetables"
+enabled = true
+
+# [categories.dairy]
+# name = "Dairy Products"
+# base_url = "https://www.naheed.pk/groceries-pets/dairy-products"
+# enabled = true
+#
+# [categories.bakery]
+# name = "Bakery Items"
+# base_url = "https://www.naheed.pk/groceries-pets/bakery-items"
+# enabled = true
+#
+[categories.meat_seafood]
+name = "Meat & Seafood"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/meat-poultry"
+enabled = true
+
+# Field mapping for data extraction
+[fields]
+# These map to the canonical schema used by JsonFlattener
+product_name = "name"
+product_price = "cost_price"
+product_id = "product_id"
+category = "category_name"
+sku = "sku"
+units = "units_of_mass"
+
+# Extraction rules specific to Naheed
+[extraction_rules]
+# Price extraction patterns
+price_patterns = [
+    "Rs\\.?\\s*[\\d,]+",
+    "PKR\\.?\\s*[\\d,]+", 
+    "₨\\.?\\s*[\\d,]+",
+    "\\d+\\s*Rs"
+]
+
+# Product ID extraction
+# Based on your sample: data-product-id="114062"
+product_id_attributes = [
+    "data-product-id",
+    "data-id",
+    "id"
+]
+
+# Price amount extraction  
+# Based on your sample: data-price-amount="2100"
+price_amount_attributes = [
+    "data-price-amount",
+    "data-price",
+    "data-cost"
+]
+
+# Units extraction from product names
+unit_patterns = [
+    "\\d+\\s*(kg|kilogram)",
+    "\\d+\\s*(g|gram|gm)",
+    "\\d+\\s*(ml|milliliter)",
+    "\\d+\\s*(l|liter|litre)",
+    "\\d+\\s*(piece|pcs)",
+    "\\d+\\s*(pack|packet)",
+    "\\d+\\s*(dozen)"
+]
+
+# Exclusion rules
+[exclusion]
+excluded_sections = [
+    "header",
+    "footer", 
+    "nav",
+    "advertisement",
+    "sidebar",
+    "breadcrumb",
+    "pagination"
+]
+
+excluded_keywords = [
+    "advertisement",
+    "sponsored",
+    "banner",
+    "footer",
+    "header",
+    "navigation",
+    "menu",
+    "breadcrumb",
+    "pagination",
+    "filter",
+    "sort",
+    "view all",
+    "show more",
+    "load more"
+]
+
+# ML model configuration (for future enhancement)
+[ml_model]
+enabled = false
+confidence_threshold = 0.7
+model_path = "models/naheed_product_classifier.bin"
+training_data_path = "training_data/naheed_training.json"
+
+# Rate limiting and anti-bot measures
+[anti_bot]
+random_delay_min_ms = 500
+random_delay_max_ms = 2000
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+]
+
+# Headers to mimic real browser requests
+[headers]
+Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+"Accept-Language" = "en-US,en;q=0.9,ur;q=0.8"
+"Accept-Encoding" = "gzip, deflate, br"
+"Cache-Control" = "max-age=0"
+"Upgrade-Insecure-Requests" = "1"
+"Sec-Fetch-Dest" = "document"
+"Sec-Fetch-Mode" = "navigate"
+"Sec-Fetch-Site" = "none"
+"Sec-Fetch-User" = "?1"
