@@ -1,0 +1,111 @@
+[api]
+name = "pandamart"
+base_url = "https://pk.fd-api.com"
+auth_token = ""
+
+[request]
+method = "POST"
+endpoint = "/api/v5/graphql"
+graphql_query = "\n    \n    fragment ProductFields on Product {\n        attributes(keys: $attributes) {\n            key\n            value\n        }\n        activeCampaigns {\n            benefitQuantity\n            cartItemUsageLimit\n            description\n            discountType\n            discountValue\n            endTime\n            id\n            isAutoAddable\n            isBenefit\n            isTrigger\n            name\n            teaserFormat\n            totalTriggerThresholdFloat\n            triggerQuantity\n            type\n        }\n        badges\n        description\n        favourite\n        globalCatalogID\n        isAvailable\n        name\n        nmrAdID\n        originalPrice\n        packagingCharge\n        parentID\n        price\n        productBadges {\n            text\n            type\n        }\n        productID\n        stockAmount\n        stockPrediction\n        tags\n        type\n        urls\n        vendorID\n        weightableAttributes {\n            weightedOriginalPrice\n            weightedPrice\n            weightValue {\n                unit\n                value\n            }\n        }\n    }\n\n\n    query getProductsByCategoryList(\n        $attributes: [String!]\n        $categoryId: String!\n        $featureFlags: [FunWithFlag!]\n        $globalEntityId: String!\n        $isDarkstore: Boolean!\n        $locale: String!\n        $userCode: String\n        $vendorID: String!\n    ) {\n        categoryProductList(\n            input: {\n                categoryID: $categoryId\n                customerID: $userCode\n                funWithFlags: $featureFlags\n                globalEntityID: $globalEntityId\n                isDarkstore: $isDarkstore\n                locale: $locale\n                platform: \"web\"\n                vendorID: $vendorID\n            }\n        ) {\n            categoryProducts {\n                id\n                name\n                items {\n                    ...ProductFields\n                }\n            }\n        }\n    }\n"
+
+[request.headers]
+accept = "application/json"
+accept-language = "en-US,en;q=0.8"
+apollographql-client-name = "web"
+apollographql-client-version = "GROCERIES-MENU-MICROFRONTEND.25.35.0013"
+content-type = "application/json;charset=UTF-8"
+origin = "https://www.foodpanda.pk"
+perseus-client-id = "1758634594324.413150011367175980.ultnhzk140"
+perseus-session-id = "1758698242645.292932723260110061.axx9y4560m"
+platform = "web"
+priority = "u=1, i"
+referer = "https://www.foodpanda.pk/"
+sec-ch-ua = "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Brave\";v=\"140\""
+sec-ch-ua-mobile = "?0"
+sec-ch-ua-platform = "\"Linux\""
+sec-fetch-dest = "empty"
+sec-fetch-mode = "cors"
+sec-fetch-site = "cross-site"
+sec-gpc = "1"
+user-agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+x-pd-language-id = "1"
+x-requested-with = "XMLHttpRequest"
+
+[request.graphql_variables]
+globalEntityId = "FP_PK"
+isDarkstore = true
+locale = "en_PK"
+userCode = ""
+vendorID = "ays9"
+
+attributes = [
+    "baseContentValue",
+    "baseUnit",
+    "freshnessGuaranteeInDays",
+    "maximumSalesQuantity",
+    "minPriceLastMonth",
+    "pricePerBaseUnit",
+    "sku",
+    "nutri_grade",
+    "sugar_level"
+]
+
+[[request.graphql_variables.featureFlags]]
+key = "pd-qc-weight-stepper"
+value = "Variation1"
+
+[response]
+# Use the common pattern extraction instead of data_path for nested structure
+# data_path = "data.categoryProductList.categoryProducts"
+
+[pagination]
+type = "none"
+
+[fields]
+target_fields = ["productID", "name", "originalPrice", "price", "attributes"]
+
+[categories]
+# Meat & Seafood
+meat_seafood = { name = "Meat & Seafood", category_id = "0d7a99a8-3b47-4970-be58-67cda1e600c0" }
+
+# Fruits & Vegetables
+fruits_vegetables = { name = "Fruits & Vegetables", category_id = "aa20e9c9-5c36-4a39-b9f2-513a291c677d" }
+
+# Dairy products
+dairy_products = { name = "Dairy Products", category_id = "35fd2d7c-7838-4b98-b86f-6a86944f896d" }
+
+# Bakery & Breakfast
+bakery_breakfast = { name = "Bakery & Breakfast", category_id = "c579905b-8afa-48c1-9741-72b274c4184e" }
+
+# Beverages
+beverages = { name = "Beverages", category_id = "143024ef-02a5-4e7a-bfa7-82e00a70e49c" }
+
+# Oil & Ghee
+oil_ghee = { name = "Oil & Ghee", category_id = "7d31bcec-06db-4a02-a63d-754c3035dcf5" }
+
+# Noodles & Pasta
+noodles_pasta = { name = "Noodles & Pasta", category_id = "3cb1867c-37b7-4b83-b179-fd4d8377e21d" }
+
+# Spices & Dressings
+spices_dressings = { name = "Spices & Dressings", category_id = "6a4c5e9a-fb13-4ee5-99e9-24f6ec3a302e" }
+
+# Tea & Coffee
+tea_coffee = { name = "Tea & Coffee", category_id = "9ee8eeb7-e637-4f87-bc45-b9463a087d7a" }
+
+# Snacks & Confectionery
+snacks_confectionery = { name = "Snacks & Confectionery", category_id = "d0983207-17e8-437a-9167-eb0578ee92e7" }
+
+# Chocolate & Desserts
+chocolate_desserts = { name = "Chocolate & Desserts", category_id = "876b9353-6d6c-4f5b-a06b-767b284c549e" }
+
+# Ice cream & Frozen
+ice_cream_frozen = { name = "Ice Cream & Frozen", category_id = "3f834f4f-1ba9-445b-9f4b-c1a88c0c5bbd" }
+
+# Personal care
+personal_care = { name = "Personal Care", category_id = "9fe85ec9-3d72-40f6-b159-44d448d830f2" }
+
+# Ready to cook & Eat
+ready_to_cook = { name = "Ready to Cook & Eat", category_id = "3aea2a54-69f0-420f-a578-4d6b6955a4a3" }
+
+# Cleaning & laundry
+cleaning_laundry = { name = "Cleaning & Laundry", category_id = "3e10c754-7108-4794-99df-fa29a3db2029" }

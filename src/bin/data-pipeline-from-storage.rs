@@ -4,9 +4,8 @@ use dotenv;
 use polars::prelude::*;
 use processor::{FieldClassifier, JsonFlattener, RuleNormalizer};
 use storage::MinioStorage;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use tracing_subscriber;
-use std::path::Path;
 
 mod config {
     pub use data_pipeline::config::*;
@@ -29,10 +28,7 @@ async fn main() -> Result<()> {
     info!("🚀 Starting Multi-Source Data Pipeline (Processing from S3/MinIO Storage)");
 
     // Define all available sources
-    let sources = vec![
-        "krave_mart",
-        "bazaar_app",
-    ];
+    let sources = vec!["krave_mart", "bazaar_app"];
 
     // Load MinIO configuration
     let minio_config = MinioConfig::from_file("src/configs/minio.toml")
@@ -64,16 +60,21 @@ async fn main() -> Result<()> {
 
     for source_name in &sources {
         info!("\n=== Processing Source from Storage: {} ===", source_name);
-        
+
         match process_source_from_storage(
             source_name,
             &storage,
             &flattener,
             &classifier,
             &normalizer,
-        ).await {
+        )
+        .await
+        {
             Ok(products_count) => {
-                info!("✅ Successfully processed {} with {} products from storage", source_name, products_count);
+                info!(
+                    "✅ Successfully processed {} with {} products from storage",
+                    source_name, products_count
+                );
                 total_products += products_count;
                 successful_sources += 1;
             }
@@ -85,9 +86,13 @@ async fn main() -> Result<()> {
     }
 
     info!("\n=== Multi-Source Pipeline Summary (from Storage) ===");
-    info!("✅ Successfully processed {} out of {} sources", successful_sources, sources.len());
+    info!(
+        "✅ Successfully processed {} out of {} sources",
+        successful_sources,
+        sources.len()
+    );
     info!("📊 Total products processed: {}", total_products);
-    
+
     if successful_sources > 0 {
         info!("🎉 Multi-source pipeline from storage completed successfully!");
     } else {
@@ -107,11 +112,16 @@ async fn process_source_from_storage(
     info!("Loading raw data from storage for {}", source_name);
 
     // Load raw data from S3/MinIO storage
-    let raw_data = storage.load_latest_raw_data(source_name).await
+    let raw_data = storage
+        .load_latest_raw_data(source_name)
+        .await
         .with_context(|| format!("Failed to load raw data for {} from storage", source_name))?;
-    
+
     let products_count = raw_data.len();
-    info!("Loaded {} products from storage for {}", products_count, source_name);
+    info!(
+        "Loaded {} products from storage for {}",
+        products_count, source_name
+    );
 
     if products_count == 0 {
         warn!("No products found in storage for {}", source_name);
@@ -140,7 +150,9 @@ async fn process_source_from_storage(
     }
 
     // Store processed data with storage suffix to distinguish from API-sourced data
-    let processed_key = storage.store_parquet(&format!("{}_from_storage", source_name), &buf).await?;
+    let processed_key = storage
+        .store_parquet(&format!("{}_from_storage", source_name), &buf)
+        .await?;
     info!("Stored processed data at: {}", processed_key);
 
     Ok(products_count)

@@ -38,6 +38,7 @@ async fn main() -> Result<()> {
         ("krave_mart", "src/configs/krave_mart.toml"),
         ("bazaar_app", "src/configs/bazaar_app.toml"),
         ("dealcart", "src/configs/dealcart.toml"),
+        ("pandamart", "src/configs/pandamart.toml"),
     ];
 
     // Load MinIO configuration (shared across all sources)
@@ -182,12 +183,14 @@ async fn process_single_source(
     info!("Found {} products in {} for processing", total_products, file_path);
 
     // Determine batch size based on dataset size
-    let batch_size = if total_products > 50000 {
-        5000  // Large datasets: 5K per batch
-    } else if total_products > 10000 {
+    let batch_size = if total_products <= 500 {
+        total_products  // Very small datasets: process all at once
+    } else if total_products <= 5000 {
+        500  // Small-medium datasets: 500 per batch
+    } else if total_products <= 50000 {
         2000  // Medium datasets: 2K per batch
     } else {
-        total_products  // Small datasets: process all at once
+        5000  // Large datasets: 5K per batch
     };
 
     info!("Processing {} products in batches of {} for memory efficiency", total_products, batch_size);
@@ -253,12 +256,14 @@ async fn process_source_from_storage(
     }
 
     // Determine batch size based on dataset size
-    let batch_size = if total_products > 50000 {
-        5000  // Large datasets: 5K per batch
-    } else if total_products > 10000 {
+    let batch_size = if total_products <= 500 {
+        total_products  // Very small datasets: process all at once
+    } else if total_products <= 5000 {
+        500  // Small-medium datasets: 500 per batch
+    } else if total_products <= 50000 {
         2000  // Medium datasets: 2K per batch
     } else {
-        total_products  // Small datasets: process all at once
+        5000  // Large datasets: 5K per batch
     };
 
     info!("Processing {} products in batches of {} for memory efficiency", total_products, batch_size);

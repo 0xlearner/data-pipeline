@@ -19,3 +19,4 @@ bazaar_app_processed_products.csv
 *.json
 *.csv
 *.txt
+*.parquet

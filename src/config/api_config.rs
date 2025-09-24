@@ -21,7 +21,7 @@ pub struct ApiSection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaginationConfig {
     pub r#type: String,
-    pub page_param: String,
+    pub page_param: Option<String>,
     pub limit_param: Option<String>,
     pub default_limit: Option<u32>,
 }
@@ -48,6 +48,8 @@ pub struct RequestConfig {
     pub product_channel: Option<String>, // For POST requests
     pub category_field: Option<String>, // Field name for category in POST body
     pub page_size: Option<i32>, // Items per page
+    pub graphql_query: Option<String>, // GraphQL query for GraphQL APIs
+    pub graphql_variables: Option<HashMap<String, serde_json::Value>>, // GraphQL variables
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

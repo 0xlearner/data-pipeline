@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde_json::Value;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -15,16 +15,14 @@ pub struct UnifiedFetcher {
 
 impl UnifiedFetcher {
     pub fn new(config: ApiConfig) -> Result<Self> {
-        let client = Client::builder()
-            .emulation(Emulation::Firefox136)
-            .build()?;
+        let client = Client::builder().emulation(Emulation::Firefox136).build()?;
 
         Ok(UnifiedFetcher { client, config })
     }
 
     pub async fn fetch_all_categories(&self) -> Result<Vec<Value>> {
         let mut all_data = Vec::new();
-        
+
         match self.config.request.method.as_str() {
             "GET" => {
                 let category_urls = self.config.build_category_urls();
@@ -55,28 +53,54 @@ impl UnifiedFetcher {
                 }
             }
             "POST" => {
-                let category_slugs = self.config.get_category_slugs();
-                for (category_key, category_slug) in category_slugs {
-                    info!("Fetching POST category: {}", category_key);
-                    match self.fetch_post_paginated(&category_slug).await {
-                        Ok(data) => {
-                            info!("Fetched {} products from {}", data.len(), category_key);
-                            all_data.extend(data);
+                // Check if this is a GraphQL API
+                if self.config.request.graphql_query.is_some() {
+                    // GraphQL API (like Pandamart)
+                    for (category_key, category) in &self.config.categories {
+                        if let Some(ref category_id) = category.category_id {
+                            info!("Fetching GraphQL category: {}", category_key);
+                            match self.fetch_graphql_single(category_id).await {
+                                Ok(data) => {
+                                    info!("Fetched {} products from {}", data.len(), category_key);
+                                    all_data.extend(data);
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "Failed to fetch GraphQL category {}: {}",
+                                        category_key, e
+                                    );
+                                }
+                            }
                         }
-                        Err(e) => {
-                            error!("Failed to fetch category {}: {}", category_key, e);
+                    }
+                } else {
+                    // Regular POST API (like BazaarApp)
+                    let category_slugs = self.config.get_category_slugs();
+                    for (category_key, category_slug) in category_slugs {
+                        info!("Fetching POST category: {}", category_key);
+                        match self.fetch_post_paginated(&category_slug).await {
+                            Ok(data) => {
+                                info!("Fetched {} products from {}", data.len(), category_key);
+                                all_data.extend(data);
+                            }
+                            Err(e) => {
+                                error!("Failed to fetch category {}: {}", category_key, e);
+                            }
                         }
                     }
                 }
             }
             _ => {
-                return Err(anyhow!("Unsupported HTTP method: {}", self.config.request.method));
+                return Err(anyhow!(
+                    "Unsupported HTTP method: {}",
+                    self.config.request.method
+                ));
             }
         }
-        
+
         Ok(all_data)
     }
-    
+
     // Method for single GET requests (no pagination)
     pub async fn fetch_get_single(&self, url: &str) -> Result<Vec<Value>> {
         info!("Fetching single GET request from: {}", url);
@@ -113,7 +137,10 @@ impl UnifiedFetcher {
         loop {
             // Safety check to prevent infinite loops
             if page > max_pages {
-                warn!("Reached maximum page limit ({}) for URL {}, stopping", max_pages, url);
+                warn!(
+                    "Reached maximum page limit ({}) for URL {}, stopping",
+                    max_pages, url
+                );
                 break;
             }
 
@@ -124,7 +151,10 @@ impl UnifiedFetcher {
             let response = match self.fetch_with_get(&paginated_url).await {
                 Ok(resp) => resp,
                 Err(e) => {
-                    warn!("Failed to fetch page {} from {}: {}", page, paginated_url, e);
+                    warn!(
+                        "Failed to fetch page {} from {}: {}",
+                        page, paginated_url, e
+                    );
                     consecutive_empty_pages += 1;
                     if consecutive_empty_pages >= max_consecutive_empty {
                         info!("Too many consecutive failures, stopping pagination");
@@ -140,7 +170,10 @@ impl UnifiedFetcher {
             let data: Value = match response.json().await {
                 Ok(json) => json,
                 Err(e) => {
-                    warn!("Failed to parse JSON response for page {} from {}: {}", page, paginated_url, e);
+                    warn!(
+                        "Failed to parse JSON response for page {} from {}: {}",
+                        page, paginated_url, e
+                    );
                     consecutive_empty_pages += 1;
                     if consecutive_empty_pages >= max_consecutive_empty {
                         info!("Too many consecutive JSON parse failures, stopping pagination");
@@ -156,10 +189,16 @@ impl UnifiedFetcher {
 
             if products.is_empty() {
                 consecutive_empty_pages += 1;
-                info!("No products found on page {} (consecutive empty: {})", page, consecutive_empty_pages);
+                info!(
+                    "No products found on page {} (consecutive empty: {})",
+                    page, consecutive_empty_pages
+                );
 
                 if consecutive_empty_pages >= max_consecutive_empty {
-                    info!("Reached {} consecutive empty pages, stopping pagination", max_consecutive_empty);
+                    info!(
+                        "Reached {} consecutive empty pages, stopping pagination",
+                        max_consecutive_empty
+                    );
                     break;
                 }
             } else {
@@ -175,7 +214,11 @@ impl UnifiedFetcher {
             sleep(Duration::from_millis(500)).await;
         }
 
-        info!("Completed pagination: {} total products across {} pages", all_products.len(), page - 1);
+        info!(
+            "Completed pagination: {} total products across {} pages",
+            all_products.len(),
+            page - 1
+        );
 
         Ok(all_products)
     }
@@ -190,7 +233,10 @@ impl UnifiedFetcher {
         loop {
             // Safety check to prevent infinite loops
             if page >= max_pages {
-                warn!("Reached maximum page limit ({}) for category {}, stopping", max_pages, category_slug);
+                warn!(
+                    "Reached maximum page limit ({}) for category {}, stopping",
+                    max_pages, category_slug
+                );
                 break;
             }
 
@@ -202,10 +248,16 @@ impl UnifiedFetcher {
             let response = match self.fetch_with_post(&request_body).await {
                 Ok(resp) => resp,
                 Err(e) => {
-                    warn!("Failed to fetch page {} for category {}: {}", page, category_slug, e);
+                    warn!(
+                        "Failed to fetch page {} for category {}: {}",
+                        page, category_slug, e
+                    );
                     consecutive_empty_pages += 1;
                     if consecutive_empty_pages >= max_consecutive_empty {
-                        info!("Too many consecutive failures, stopping pagination for category {}", category_slug);
+                        info!(
+                            "Too many consecutive failures, stopping pagination for category {}",
+                            category_slug
+                        );
                         break;
                     }
                     page += 1;
@@ -218,10 +270,16 @@ impl UnifiedFetcher {
             let data: Value = match response.json().await {
                 Ok(json) => json,
                 Err(e) => {
-                    warn!("Failed to parse JSON response for page {} of category {}: {}", page, category_slug, e);
+                    warn!(
+                        "Failed to parse JSON response for page {} of category {}: {}",
+                        page, category_slug, e
+                    );
                     consecutive_empty_pages += 1;
                     if consecutive_empty_pages >= max_consecutive_empty {
-                        info!("Too many consecutive JSON parse failures, stopping pagination for category {}", category_slug);
+                        info!(
+                            "Too many consecutive JSON parse failures, stopping pagination for category {}",
+                            category_slug
+                        );
                         break;
                     }
                     page += 1;
@@ -234,18 +292,27 @@ impl UnifiedFetcher {
 
             if products.is_empty() {
                 consecutive_empty_pages += 1;
-                info!("No products found on page {} for category {} (consecutive empty: {})",
-                    page, category_slug, consecutive_empty_pages);
+                info!(
+                    "No products found on page {} for category {} (consecutive empty: {})",
+                    page, category_slug, consecutive_empty_pages
+                );
 
                 if consecutive_empty_pages >= max_consecutive_empty {
-                    info!("Reached {} consecutive empty pages, stopping pagination for category {}",
-                        max_consecutive_empty, category_slug);
+                    info!(
+                        "Reached {} consecutive empty pages, stopping pagination for category {}",
+                        max_consecutive_empty, category_slug
+                    );
                     break;
                 }
             } else {
                 // Reset consecutive empty counter when we find products
                 consecutive_empty_pages = 0;
-                info!("Found {} products on page {} for category {}", products.len(), page, category_slug);
+                info!(
+                    "Found {} products on page {} for category {}",
+                    products.len(),
+                    page,
+                    category_slug
+                );
                 all_products.extend(products);
             }
 
@@ -255,58 +322,103 @@ impl UnifiedFetcher {
             sleep(Duration::from_millis(500)).await;
         }
 
-        info!("Completed pagination for category {}: {} total products across {} pages",
-            category_slug, all_products.len(), page);
+        info!(
+            "Completed pagination for category {}: {} total products across {} pages",
+            category_slug,
+            all_products.len(),
+            page
+        );
 
         Ok(all_products)
     }
 
+    // Method for GraphQL POST requests (like Pandamart)
+    pub async fn fetch_graphql_single(&self, category_id: &str) -> Result<Vec<Value>> {
+        info!("Fetching GraphQL request for category: {}", category_id);
+
+        let request_body = self.build_graphql_request_body(category_id)?;
+
+        // Handle potential API errors gracefully
+        let response = match self.fetch_with_post(&request_body).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Err(anyhow!(
+                    "Failed to fetch GraphQL for category {}: {}",
+                    category_id,
+                    e
+                ));
+            }
+        };
+
+        // Parse JSON response
+        let data: Value = match response.json().await {
+            Ok(json) => json,
+            Err(e) => {
+                return Err(anyhow!(
+                    "Failed to parse GraphQL JSON response for category {}: {}",
+                    category_id,
+                    e
+                ));
+            }
+        };
+
+        let products = self.extract_products(&data)?;
+        info!(
+            "Found {} products in GraphQL request for category {}",
+            products.len(),
+            category_id
+        );
+
+        Ok(products)
+    }
+
     async fn fetch_with_get(&self, url: &str) -> Result<Response> {
         let mut request = self.client.get(url);
-        
+
         // Add authorization if configured
         if let Some(ref auth) = self.config.request.authorization {
             request = request.header("Authorization", auth);
         }
-        
+
         // Add any additional headers
         for (key, value) in &self.config.request.headers {
             request = request.header(key, value);
         }
-        
+
         let response = request.send().await?;
-        
+
         if !response.status().is_success() {
             return Err(anyhow!("HTTP error: {}", response.status()));
         }
-        
+
         Ok(response)
     }
 
     async fn fetch_with_post(&self, request_body: &Value) -> Result<Response> {
         let url = self.config.build_request_url();
-        
-        let mut request = self.client
+
+        let mut request = self
+            .client
             .post(&url)
             .header("Content-Type", "application/json")
             .json(request_body);
-        
+
         // Add authorization if configured
         if let Some(ref auth) = self.config.request.authorization {
             request = request.header("Authorization", auth);
         }
-        
+
         // Add any additional headers
         for (key, value) in &self.config.request.headers {
             request = request.header(key, value);
         }
-        
+
         let response = request.send().await?;
-        
+
         if !response.status().is_success() {
             return Err(anyhow!("HTTP error: {}", response.status()));
         }
-        
+
         Ok(response)
     }
 
@@ -327,12 +439,43 @@ impl UnifiedFetcher {
         Ok(body)
     }
 
+    pub fn build_graphql_request_body(&self, category_id: &str) -> Result<Value> {
+        // Build GraphQL request body for Pandamart
+        let query = self
+            .config
+            .request
+            .graphql_query
+            .as_ref()
+            .ok_or_else(|| anyhow!("GraphQL query not configured"))?;
+
+        let mut variables = self
+            .config
+            .request
+            .graphql_variables
+            .as_ref()
+            .cloned()
+            .unwrap_or_default();
+
+        // Set the category ID in variables
+        variables.insert(
+            "categoryId".to_string(),
+            serde_json::Value::String(category_id.to_string()),
+        );
+
+        let body = serde_json::json!({
+            "query": query,
+            "variables": variables
+        });
+
+        Ok(body)
+    }
+
     fn extract_products(&self, data: &Value) -> Result<Vec<Value>> {
         // Try different extraction patterns based on configuration
         if let Some(ref extraction_path) = self.config.response.data_path {
             return self.extract_by_path(data, extraction_path);
         }
-        
+
         // Fallback to common patterns
         self.extract_by_common_patterns(data)
     }
@@ -340,11 +483,11 @@ impl UnifiedFetcher {
     fn extract_by_path(&self, data: &Value, path: &str) -> Result<Vec<Value>> {
         let path_parts: Vec<&str> = path.split('.').collect();
         let mut current = data;
-        
+
         for part in path_parts {
             if part.ends_with("[]") {
                 // Array access
-                let field = &part[..part.len()-2];
+                let field = &part[..part.len() - 2];
                 if let Some(array) = current.get(field).and_then(|v| v.as_array()) {
                     return Ok(array.clone());
                 } else {
@@ -355,7 +498,7 @@ impl UnifiedFetcher {
                 current = current.get(part).unwrap_or(&Value::Null);
             }
         }
-        
+
         if let Some(array) = current.as_array() {
             Ok(array.clone())
         } else {
@@ -368,30 +511,61 @@ impl UnifiedFetcher {
         if let Some(products_array) = data.as_array() {
             return Ok(products_array.clone());
         }
-        
+
         // Pattern 2: KraveMart style - data[].l2_products[]
         if let Some(data_array) = data.get("data").and_then(|d| d.as_array()) {
             let mut all_products = Vec::new();
             for item in data_array {
                 if let Some(l2_products) = item.get("l2_products").and_then(|p| p.as_array()) {
                     all_products.extend(l2_products.clone());
-                } else if let Some(krave_mart_products) = item.get("krave_mart_products").and_then(|p| p.as_array()) {
+                } else if let Some(krave_mart_products) =
+                    item.get("krave_mart_products").and_then(|p| p.as_array())
+                {
                     all_products.extend(krave_mart_products.clone());
                 }
             }
             return Ok(all_products);
         }
-        
+
         // Pattern 3: Simple products field
         if let Some(products) = data.get("products").and_then(|p| p.as_array()) {
             return Ok(products.clone());
         }
-        
+
         // Pattern 4: Items field
         if let Some(items) = data.get("items").and_then(|i| i.as_array()) {
             return Ok(items.clone());
         }
-        
+
+        // Pattern 5: Pandamart GraphQL style - data.categoryProductList.categoryProducts[].items[]
+        if let Some(category_products) = data
+            .get("data")
+            .and_then(|d| d.get("categoryProductList"))
+            .and_then(|cpl| cpl.get("categoryProducts"))
+            .and_then(|cp| cp.as_array())
+        {
+            let mut all_products = Vec::new();
+            for category in category_products {
+                if let Some(items) = category.get("items").and_then(|i| i.as_array()) {
+                    // Add category name to each product for better tracking
+                    let category_name = category
+                        .get("name")
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("Unknown");
+                    for mut item in items.clone() {
+                        if let Some(item_obj) = item.as_object_mut() {
+                            item_obj.insert(
+                                "category_section".to_string(),
+                                serde_json::Value::String(category_name.to_string()),
+                            );
+                        }
+                        all_products.push(item);
+                    }
+                }
+            }
+            return Ok(all_products);
+        }
+
         // If no pattern matches, return empty
         warn!("No products found in response structure");
         Ok(Vec::new())

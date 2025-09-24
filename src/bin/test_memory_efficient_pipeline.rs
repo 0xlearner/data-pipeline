@@ -97,12 +97,14 @@ async fn test_memory_efficient_processing(
     }
 
     // Determine batch size based on dataset size
-    let (batch_size, processing_method) = if total_products > 50000 {
-        (5000, "Large dataset - batched processing (5K per batch)")
-    } else if total_products > 10000 {
+    let (batch_size, processing_method) = if total_products <= 500 {
+        (total_products, "Very small dataset - standard processing")
+    } else if total_products <= 5000 {
+        (500, "Small-medium dataset - batched processing (500 per batch)")
+    } else if total_products <= 50000 {
         (2000, "Medium dataset - batched processing (2K per batch)")
     } else {
-        (total_products, "Small dataset - standard processing")
+        (5000, "Large dataset - batched processing (5K per batch)")
     };
 
     info!("🔧 Processing method: {}", processing_method);

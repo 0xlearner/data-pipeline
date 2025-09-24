@@ -39,6 +39,10 @@ path = "src/bin/test_unified_pipeline.rs"
 name = "test_pagination_robustness"
 path = "src/bin/test_pagination_robustness.rs"
 
+[[bin]]
+name = "test_pandamart"
+path = "src/bin/test_pandamart.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 wreq = { version = "5", features = ["json"] }

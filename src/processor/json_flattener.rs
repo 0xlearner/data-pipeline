@@ -52,9 +52,10 @@ impl JsonFlattener {
 
     /// Process JSON data in batches and return a combined DataFrame
     /// This is more memory efficient for large datasets
+
     pub fn flatten_to_dataframe_batched(
         &self,
-        batches: impl Iterator<Item = Result<Vec<Value>>>
+        batches: impl Iterator<Item = Result<Vec<Value>>>,
     ) -> Result<DataFrame> {
         let mut all_dataframes = Vec::new();
         let mut total_successful = 0;
@@ -65,7 +66,11 @@ impl JsonFlattener {
             let batch = batch_result?;
             batch_count += 1;
 
-            info!("Processing batch {} with {} items", batch_count, batch.len());
+            info!(
+                "Processing batch {} with {} items",
+                batch_count,
+                batch.len()
+            );
 
             let mut records = Vec::new();
             let mut successful_count = 0;
@@ -93,8 +98,10 @@ impl JsonFlattener {
             if !records.is_empty() {
                 let batch_df = self.records_to_dataframe(records)?;
                 all_dataframes.push(batch_df);
-                info!("Batch {} processed: {} successful, {} failed",
-                      batch_count, successful_count, failed_count);
+                info!(
+                    "Batch {} processed: {} successful, {} failed",
+                    batch_count, successful_count, failed_count
+                );
             }
         }
 
@@ -113,7 +120,8 @@ impl JsonFlattener {
             let mut iter = all_dataframes.into_iter();
             let mut combined = iter.next().unwrap();
             for df in iter {
-                combined = combined.vstack(&df)
+                combined = combined
+                    .vstack(&df)
                     .map_err(|e| anyhow!("Failed to combine DataFrames: {}", e))?;
             }
             Ok(combined)
@@ -134,14 +142,37 @@ impl JsonFlattener {
         // Helper function to safely extract number values
         let get_number = |key: &str| -> Option<String> {
             item.get(key).and_then(|v| match v {
-                Value::Number(n) => Some(n.to_string()),
-                Value::String(s) => s.parse::<f64>().ok().map(|f| f.to_string()),
+                Value::Number(n) => {
+                    if let Some(f) = n.as_f64() {
+                        // Format as integer if it's a whole number
+                        if f.fract() == 0.0 {
+                            Some((f as i64).to_string())
+                        } else {
+                            Some(f.to_string())
+                        }
+                    } else {
+                        Some(n.to_string())
+                    }
+                }
+                Value::String(s) => {
+                    s.parse::<f64>().ok().map(|f| {
+                        // Format as integer if it's a whole number
+                        if f.fract() == 0.0 {
+                            (f as i64).to_string()
+                        } else {
+                            f.to_string()
+                        }
+                    })
+                }
                 _ => None,
             })
         };
 
         // Extract identifier - try multiple field names
         let identifier = if let Some(product_id) = item.get("product_id").and_then(|v| v.as_u64()) {
+            Some(product_id.to_string())
+        } else if let Some(product_id) = item.get("productID").and_then(|v| v.as_str()) {
+            // Pandamart: productID field
             Some(product_id.to_string())
         } else {
             let sku = get_string("sku");
@@ -190,6 +221,7 @@ impl JsonFlattener {
             .or_else(|| get_number("special_price"))
             .or_else(|| get_number("discountedPrice"))
             .or_else(|| get_number("discounted_price"))
+            .or_else(|| get_number("price")) // Pandamart: price field
             // Dealcart: Extract from groupRanges[0].discountedPrice
             .or_else(|| {
                 item.get("groupRanges")
@@ -208,6 +240,8 @@ impl JsonFlattener {
             .or_else(|| get_number("product_price"))
             .or_else(|| get_number("actualPrice"))
             .or_else(|| get_number("actual_price"))
+            .or_else(|| get_number("originalPrice")) // Pandamart: originalPrice field
+            .or_else(|| get_number("original_price")) // Pandamart: original_price field
             // Dealcart: Extract from inventories[0].dcImsMrp
             .or_else(|| {
                 item.get("inventories")
@@ -221,10 +255,30 @@ impl JsonFlattener {
             record.insert("mrp".to_string(), mrp);
         }
 
-
-
         // Extract sku with fallback to identifier
-        let sku = get_string("sku");
+        let sku = {
+            let direct_sku = get_string("sku");
+            if !direct_sku.is_empty() {
+                direct_sku
+            } else {
+                // Pandamart: Extract from attributes array where key="sku"
+                item.get("attributes")
+                    .and_then(|attrs| attrs.as_array())
+                    .and_then(|arr| {
+                        arr.iter().find(|attr| {
+                            attr.get("key")
+                                .and_then(|k| k.as_str())
+                                .map(|k| k == "sku")
+                                .unwrap_or(false)
+                        })
+                    })
+                    .and_then(|attr| attr.get("value"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+            }
+        };
+
         if !sku.is_empty() {
             record.insert("sku".to_string(), sku);
         } else if let Some(ref id) = identifier {
@@ -233,14 +287,75 @@ impl JsonFlattener {
 
         // Extract discount percentage with multiple fallbacks
         let discount = get_number("sku_percent_off")
+            .or_else(|| {
+                get_string("sku_percent_off")
+                    .parse::<f64>()
+                    .ok()
+                    .map(|f| f.to_string())
+            })
+            .or_else(|| {
+                // Handle string values like "40% off"
+                let sku_percent_str = get_string("sku_percent_off");
+                if !sku_percent_str.is_empty() {
+                    Some(sku_percent_str)
+                } else {
+                    None
+                }
+            })
             .or_else(|| get_number("discount_percentage"))
-            .or_else(|| get_number("discountPercentage"));
+            .or_else(|| get_number("discountPercentage"))
+            // Pandamart: No discount field, default to 0.00
+            .or_else(|| {
+                if item.get("productID").is_some() {
+                    Some("0.00".to_string())
+                } else {
+                    None
+                }
+            });
         if let Some(discount) = discount {
             record.insert("sku_percent_off".to_string(), discount);
         }
 
+        // Extract units_of_mass (Pandamart: from attributes array where key="baseUnit")
+        let units_of_mass = {
+            let direct_units = get_string("units_of_mass");
+            if !direct_units.is_empty() {
+                direct_units
+            } else {
+                let unit = get_string("unit");
+                if !unit.is_empty() {
+                    unit
+                } else {
+                    let base_unit = get_string("baseUnit");
+                    if !base_unit.is_empty() {
+                        base_unit
+                    } else {
+                        // Pandamart: Extract from attributes array where key="baseUnit"
+                        item.get("attributes")
+                            .and_then(|attrs| attrs.as_array())
+                            .and_then(|arr| {
+                                arr.iter().find(|attr| {
+                                    attr.get("key")
+                                        .and_then(|k| k.as_str())
+                                        .map(|k| k == "baseUnit")
+                                        .unwrap_or(false)
+                                })
+                            })
+                            .and_then(|attr| attr.get("value"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| "N/A".to_string())
+                    }
+                }
+            }
+        };
+
+        record.insert("units_of_mass".to_string(), units_of_mass);
+
         // Extract category names with multiple fallbacks
-        let category_names = if let Some(categories) = item.get("categories").and_then(|v| v.as_array()) {
+        let category_names = if let Some(categories) =
+            item.get("categories").and_then(|v| v.as_array())
+        {
             let names: Vec<String> = categories
                 .iter()
                 .filter_map(|cat| {
@@ -250,7 +365,9 @@ impl JsonFlattener {
                 })
                 .collect();
             names.join(", ")
-        } else if let Some(product_categories) = item.get("productCategory").and_then(|v| v.as_array()) {
+        } else if let Some(product_categories) =
+            item.get("productCategory").and_then(|v| v.as_array())
+        {
             // Dealcart: Extract from productCategory array
             let names: Vec<String> = product_categories
                 .iter()
@@ -262,6 +379,10 @@ impl JsonFlattener {
                 })
                 .collect();
             names.join(", ")
+        } else if let Some(category_section) = item.get("category_section").and_then(|v| v.as_str())
+        {
+            // Pandamart: Use the category_section we added in the fetcher
+            category_section.to_string()
         } else {
             // Try direct category field
             let cat = get_string("category");
@@ -298,6 +419,7 @@ impl JsonFlattener {
             "product_id",
             "sku_percent_off",
             "category_name",
+            "units_of_mass",
         ];
 
         for field in fields.iter() {
@@ -336,9 +458,11 @@ mod tests {
             "categories": []
         });
 
-        let result = flattener.extract_fields_directly(&product_with_primary).unwrap();
-        assert_eq!(result.get("cost_price").unwrap(), "100.0");
-        assert_eq!(result.get("mrp").unwrap(), "150.0");
+        let result = flattener
+            .extract_fields_directly(&product_with_primary)
+            .unwrap();
+        assert_eq!(result.get("cost_price").unwrap(), "100");
+        assert_eq!(result.get("mrp").unwrap(), "150");
 
         // Test case 2: Primary fields are null, fallback fields are present
         let product_with_fallback = json!({
@@ -353,7 +477,9 @@ mod tests {
             "categories": []
         });
 
-        let result = flattener.extract_fields_directly(&product_with_fallback).unwrap();
+        let result = flattener
+            .extract_fields_directly(&product_with_fallback)
+            .unwrap();
         assert_eq!(result.get("cost_price").unwrap(), "234");
         assert_eq!(result.get("mrp").unwrap(), "390");
 
@@ -366,7 +492,9 @@ mod tests {
             "categories": []
         });
 
-        let result = flattener.extract_fields_directly(&product_no_prices).unwrap();
+        let result = flattener
+            .extract_fields_directly(&product_no_prices)
+            .unwrap();
         assert!(!result.contains_key("cost_price"));
         assert!(!result.contains_key("mrp"));
     }
@@ -429,5 +557,38 @@ mod tests {
         assert_eq!(result.get("sku").unwrap(), "BNDL7002230");
         assert_eq!(result.get("sku_percent_off").unwrap(), "40% off");
         assert_eq!(result.get("category_name").unwrap(), "fruits & vegetables");
+    }
+
+    #[test]
+    fn test_pandamart_json_flattening() {
+        let flattener = JsonFlattener::new();
+
+        // Test with Pandamart-style data structure
+        let pandamart_product = json!({
+            "id": "12345",
+            "name": "Fresh Bananas",
+            "description": "Premium quality bananas",
+            "price": 150.0,
+            "original_price": 200.0,
+            "discount_percentage": 25,
+            "category_section": "Fresh Fruits",
+            "availability": true,
+            "store_info": {
+                "store_id": "pandamart_001",
+                "location": "Downtown"
+            }
+        });
+
+        let result = flattener
+            .extract_fields_directly(&pandamart_product)
+            .unwrap();
+
+        // Verify Pandamart-specific field extraction
+        assert_eq!(result.get("product_id").unwrap(), "12345");
+        assert_eq!(result.get("name").unwrap(), "Fresh Bananas");
+        assert_eq!(result.get("cost_price").unwrap(), "150"); // price -> cost_price
+        assert_eq!(result.get("mrp").unwrap(), "200"); // original_price -> mrp
+        assert_eq!(result.get("sku_percent_off").unwrap(), "25"); // discount_percentage
+        assert_eq!(result.get("category_name").unwrap(), "Fresh Fruits"); // category_section
     }
 }
