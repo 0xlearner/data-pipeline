@@ -8,6 +8,12 @@ pub struct HtmlConfig {
     pub scraping: ScrapingConfig,
     pub selectors: SelectorConfig,
     pub categories: HashMap<String, CategoryConfig>,
+    pub fields: Option<FieldsConfig>,
+    pub extraction_rules: Option<ExtractionRulesConfig>,
+    pub exclusion: Option<ExclusionConfig>,
+    pub ml_model: Option<MlModelConfig>,
+    pub anti_bot: Option<AntiBotConfig>,
+    pub headers: Option<HashMap<String, String>>,
 }
 
 /// Basic site information
@@ -44,6 +50,50 @@ pub struct CategoryConfig {
     pub name: String,
     pub base_url: String,
     pub enabled: bool,
+}
+
+/// Field mapping configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldsConfig {
+    pub product_name: Option<String>,
+    pub product_price: Option<String>,
+    pub product_id: Option<String>,
+    pub category: Option<String>,
+    pub sku: Option<String>,
+    pub units: Option<String>,
+}
+
+/// Extraction rules configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractionRulesConfig {
+    pub price_patterns: Option<Vec<String>>,
+    pub product_id_attributes: Option<Vec<String>>,
+    pub price_amount_attributes: Option<Vec<String>>,
+    pub unit_patterns: Option<Vec<String>>,
+}
+
+/// Exclusion rules configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExclusionConfig {
+    pub excluded_sections: Option<Vec<String>>,
+    pub excluded_keywords: Option<Vec<String>>,
+}
+
+/// ML model configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MlModelConfig {
+    pub enabled: bool,
+    pub confidence_threshold: Option<f64>,
+    pub model_path: Option<String>,
+    pub training_data_path: Option<String>,
+}
+
+/// Anti-bot configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AntiBotConfig {
+    pub random_delay_min_ms: Option<u64>,
+    pub random_delay_max_ms: Option<u64>,
+    pub user_agents: Option<Vec<String>>,
 }
 
 impl HtmlConfig {
@@ -140,16 +190,22 @@ mod tests {
     #[test]
     fn test_enabled_categories_filter() {
         let mut categories = HashMap::new();
-        categories.insert("fruits".to_string(), CategoryConfig {
-            name: "Fresh Fruits".to_string(),
-            base_url: "https://example.com/fruits".to_string(),
-            enabled: true,
-        });
-        categories.insert("disabled".to_string(), CategoryConfig {
-            name: "Disabled Category".to_string(),
-            base_url: "https://example.com/disabled".to_string(),
-            enabled: false,
-        });
+        categories.insert(
+            "fruits".to_string(),
+            CategoryConfig {
+                name: "Fresh Fruits".to_string(),
+                base_url: "https://example.com/fruits".to_string(),
+                enabled: true,
+            },
+        );
+        categories.insert(
+            "disabled".to_string(),
+            CategoryConfig {
+                name: "Disabled Category".to_string(),
+                base_url: "https://example.com/disabled".to_string(),
+                enabled: false,
+            },
+        );
 
         let config = HtmlConfig {
             site: SiteConfig {
@@ -160,6 +216,12 @@ mod tests {
             scraping: ScrapingConfig::default(),
             selectors: SelectorConfig::default(),
             categories,
+            fields: None,
+            extraction_rules: None,
+            exclusion: None,
+            ml_model: None,
+            anti_bot: None,
+            headers: None,
         };
 
         let enabled = config.get_enabled_categories();

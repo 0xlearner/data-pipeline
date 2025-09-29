@@ -50,7 +50,6 @@ impl MinioConfig {
         Ok(config)
     }
 
-    #[allow(dead_code)]
     pub fn from_file_with_env_prefix(path: &str, env_prefix: &str) -> Result<Self> {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read MinIO config file: {}", path))?;
@@ -96,7 +95,6 @@ impl MinioConfig {
         Ok(())
     }
 
-    #[allow(dead_code)]
     fn load_credentials_with_prefix(&mut self, prefix: &str) -> Result<()> {
         // Environment variable names with custom prefix
         let access_key_var = format!("{}_ACCESS_KEY", prefix.to_uppercase());
@@ -125,7 +123,6 @@ impl MinioConfig {
             .ok_or_else(|| anyhow::anyhow!("Secret key not loaded"))
     }
 
-    #[allow(dead_code)]
     pub fn is_ssl(&self) -> bool {
         self.ssl
             .unwrap_or_else(|| self.endpoint.starts_with("https://"))

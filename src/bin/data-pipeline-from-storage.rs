@@ -31,7 +31,7 @@ async fn main() -> Result<()> {
     let sources = vec!["krave_mart", "bazaar_app"];
 
     // Load MinIO configuration
-    let minio_config = MinioConfig::from_file("src/configs/minio.toml")
+    let minio_config = MinioConfig::from_file("config/sources/minio.toml")
         .context("Failed to load MinIO configuration")?;
 
     info!(

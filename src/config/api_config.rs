@@ -41,20 +41,21 @@ pub struct CategoryConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestConfig {
-    pub method: String, // "GET" or "POST"
-    pub endpoint: Option<String>, // For POST requests
-    pub authorization: Option<String>, // Bearer token, etc.
+    pub method: String,                   // "GET" or "POST"
+    pub endpoint: Option<String>,         // For POST requests
+    pub authorization: Option<String>,    // Bearer token, etc.
     pub headers: HashMap<String, String>, // Additional headers
-    pub product_channel: Option<String>, // For POST requests
-    pub category_field: Option<String>, // Field name for category in POST body
-    pub page_size: Option<i32>, // Items per page
-    pub graphql_query: Option<String>, // GraphQL query for GraphQL APIs
+    pub product_channel: Option<String>,  // For POST requests
+    pub category_field: Option<String>,   // Field name for category in POST body
+    pub page_size: Option<i32>,           // Items per page
+    pub graphql_query: Option<String>,    // GraphQL query for GraphQL APIs
     pub graphql_variables: Option<HashMap<String, serde_json::Value>>, // GraphQL variables
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponseConfig {
     pub data_path: Option<String>, // Path to extract products, e.g., "data[].l2_products[]"
+    pub total_pages_path: Option<String>,
 }
 
 impl ApiConfig {
@@ -97,7 +98,10 @@ impl ApiConfig {
         self.categories
             .iter()
             .filter_map(|(key, category)| {
-                category.core_category_slug.as_ref().map(|slug| (key.clone(), slug.clone()))
+                category
+                    .core_category_slug
+                    .as_ref()
+                    .map(|slug| (key.clone(), slug.clone()))
             })
             .collect()
     }
@@ -108,5 +112,52 @@ impl ApiConfig {
         } else {
             self.api.base_url.clone()
         }
+    }
+
+    pub fn build_pagination_request_body(
+        &self,
+        category_slug: &str,
+        page: i32,
+    ) -> Result<serde_json::Value, anyhow::Error> {
+        if self.api.name == "bazaarapp" {
+            let page_size = self.request.page_size.unwrap_or(20);
+            let product_channel = self.request.product_channel.as_deref().unwrap_or("WEB_APP");
+            return Ok(serde_json::json!({
+                "productChannel": product_channel,
+                "paginationRequestDTO": {
+                    "page": page,
+                    "size": page_size
+                },
+                "searchKey": "",
+                "brandIds": [],
+                "coreCategorySlug": category_slug,
+                "subcategorySlugs": []
+            }));
+        }
+
+        let mut body = serde_json::json!({});
+
+        // Add category field if configured
+        if let Some(ref category_field) = self.request.category_field {
+            body[category_field] = serde_json::Value::String(category_slug.to_string());
+        }
+
+        // Add product channel if configured
+        if let Some(ref product_channel) = self.request.product_channel {
+            body["productChannel"] = serde_json::Value::String(product_channel.clone());
+        }
+
+        // Add pagination fields
+        if let Some(ref page_param) = self.pagination.page_param {
+            body[page_param] = serde_json::Value::Number(page.into());
+        }
+
+        if let Some(page_size) = self.request.page_size {
+            if let Some(ref limit_param) = self.pagination.limit_param {
+                body[limit_param] = serde_json::Value::Number(page_size.into());
+            }
+        }
+
+        Ok(body)
     }
 }

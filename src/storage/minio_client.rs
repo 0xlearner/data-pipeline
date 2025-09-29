@@ -80,7 +80,6 @@ impl MinioStorage {
         Self::from_config(&config)
     }
 
-    #[allow(dead_code)]
     pub fn from_config_file_with_env_prefix(config_path: &str, env_prefix: &str) -> Result<Self> {
         let config = MinioConfig::from_file_with_env_prefix(config_path, env_prefix)?;
         Self::from_config(&config)
@@ -165,7 +164,6 @@ impl MinioStorage {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn list_objects(&self, prefix: Option<&str>) -> Result<Vec<String>> {
         let prefix_str = prefix.unwrap_or("").to_string();
         let list = self.bucket.list(prefix_str, None).await?;
@@ -210,7 +208,9 @@ impl MinioStorage {
         for result in list {
             for object in result.contents {
                 // Check if this is a raw JSON file for the specified API
-                if object.key.contains(&format!("raw/{}/", api_name)) && object.key.ends_with(".json") {
+                if object.key.contains(&format!("raw/{}/", api_name))
+                    && object.key.ends_with(".json")
+                {
                     raw_files.push(object.key);
                 }
             }
@@ -229,7 +229,9 @@ impl MinioStorage {
 
     /// Load and parse raw JSON data from the most recent file for an API source
     pub async fn load_latest_raw_data(&self, api_name: &str) -> Result<Vec<serde_json::Value>> {
-        let latest_file = self.get_latest_raw_file(api_name).await?
+        let latest_file = self
+            .get_latest_raw_file(api_name)
+            .await?
             .ok_or_else(|| anyhow!("No raw data files found for API: {}", api_name))?;
 
         info!("Loading raw data from: {}", latest_file);
@@ -245,22 +247,32 @@ impl MinioStorage {
     pub async fn stream_latest_raw_data_batched(
         &self,
         api_name: &str,
-        batch_size: usize
+        batch_size: usize,
     ) -> Result<impl Iterator<Item = Result<Vec<serde_json::Value>>>> {
-        let latest_file = self.get_latest_raw_file(api_name).await?
+        let latest_file = self
+            .get_latest_raw_file(api_name)
+            .await?
             .ok_or_else(|| anyhow!("No raw data files found for API: {}", api_name))?;
 
-        info!("Streaming raw data in batches of {} from: {}", batch_size, latest_file);
+        info!(
+            "Streaming raw data in batches of {} from: {}",
+            batch_size, latest_file
+        );
         let json_str = self.get_raw_json(&latest_file).await?;
 
         // Parse the entire JSON array first (we need to do this to get individual items)
         let data: Vec<serde_json::Value> = serde_json::from_str(&json_str)
             .map_err(|e| anyhow!("Failed to parse JSON data: {}", e))?;
 
-        info!("Total items to process: {}, batch size: {}", data.len(), batch_size);
+        info!(
+            "Total items to process: {}, batch size: {}",
+            data.len(),
+            batch_size
+        );
 
         // Create an iterator that yields batches
-        let batches = data.chunks(batch_size)
+        let batches = data
+            .chunks(batch_size)
             .map(|chunk| Ok(chunk.to_vec()))
             .collect::<Vec<_>>();
 
@@ -269,7 +281,9 @@ impl MinioStorage {
 
     /// Get metadata about the latest raw data file without loading it
     pub async fn get_latest_raw_data_info(&self, api_name: &str) -> Result<(String, usize)> {
-        let latest_file = self.get_latest_raw_file(api_name).await?
+        let latest_file = self
+            .get_latest_raw_file(api_name)
+            .await?
             .ok_or_else(|| anyhow!("No raw data files found for API: {}", api_name))?;
 
         // Get file size by loading just the JSON structure
@@ -295,7 +309,6 @@ impl MinioStorage {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get_bucket_name(&self) -> &str {
         &self.bucket.name
     }
@@ -304,7 +317,7 @@ impl MinioStorage {
 impl Default for MinioStorage {
     fn default() -> Self {
         // Try to create from default config file first
-        if let Ok(storage) = Self::from_config_file("src/configs/minio.toml") {
+        if let Ok(storage) = Self::from_config_file("config/sources/minio.toml") {
             return storage;
         }
 

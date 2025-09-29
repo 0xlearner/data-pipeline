@@ -1,0 +1,614 @@
+# Naheed Store Configuration
+# HTML-based web scraping configuration for Naheed.pk
+
+[site]
+name = "Naheed Store"
+base_url = "https://www.naheed.pk"
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+[scraping]
+delay_between_requests_ms = 2000
+max_pages_per_category = 5
+max_retries = 3
+timeout_seconds = 30
+respect_robots_txt = true
+
+[selectors]
+# Product container selectors - need to find the parent containers that contain both name and price
+product_selectors = [
+    "li.item",
+    ".item",
+    "li[class*='item']",
+    ".product-item-info",
+    ".product-item",
+    "div[class*='product']",
+    ".product-card"
+]
+
+# Product name selectors - comprehensive list to find product names
+name_selectors = [
+    "h2",
+    "a[title]",
+    ".product-name",
+    ".product-item-name",
+    ".item-title",
+    ".product-title",
+    "h3",
+    ".title",
+    "strong",
+    ".name",
+    "[class*='name']",
+    "[class*='title']"
+]
+
+# Price selectors (based on your sample: data-price-amount attribute)
+price_selectors = [
+    "[data-price-amount]",
+    ".price",
+    ".regular-price",
+    ".final-price",
+    ".cost",
+    ".amount",
+    "[class*='price']",
+    ".product-price",
+    "span[class*='rs']",
+    "span",
+    ".price-wrapper"
+]
+
+# Category selectors (based on your sample: span.base with data-ui-id)
+category_selectors = [
+    "span.base[data-ui-id='page-title-wrapper']",
+    ".page-title",
+    ".breadcrumb",
+    "h1",
+    ".category-title"
+]
+
+pagination_selectors = [
+    "#am-page-count",
+    ".pagination",
+    ".pager",
+    ".page-numbers"
+]
+
+# Categories to scrape
+
+# Fresh Products
+[categories.fresh_fruits]
+name = "Fresh Fruits"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/fruits"
+enabled = true
+
+[categories.vegetables]
+name = "Vegetables"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/vegetables"
+enabled = true
+
+# Meat & Poultry
+[categories.chicken]
+name = "Chicken"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/meat-poultry/chicken"
+enabled = true
+
+[categories.beef_veal]
+name = "Beef & Veal"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/meat-poultry/beef-veal"
+enabled = true
+
+[categories.mutton]
+name = "Mutton"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/meat-poultry/mutton"
+enabled = true
+
+[categories.seafood]
+name = "Seafood"
+base_url = "https://www.naheed.pk/groceries-pets/fresh-products/sea-food"
+enabled = true
+
+# Frozen
+[categories.bbq_kababs]
+name = "BBQ Kababs & Koftas"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/kabab-kofta"
+enabled = true
+
+[categories.frozen_chicken]
+name = "Frozen Chicken"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/chicken"
+enabled = true
+
+[categories.pizza_dough]
+name = "Pizza Dough & Toppings"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/bread-dough"
+enabled = true
+
+[categories.desserts_sweet]
+name = "Desserts & Sweet Toppings"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/desserts-toppings"
+enabled = true
+
+[categories.frozen_fruits_vegetables]
+name = "Frozen Fruits & Vegetables"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/frozen-vegetable"
+enabled = true
+
+[categories.frozen_seafood]
+name = "Frozen Seafood"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/seafood"
+enabled = true
+
+[categories.fries]
+name = "Fries"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/fries"
+enabled = true
+
+[categories.nuggets_snacks]
+name = "Nuggets & Snacks"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/nuggets-snacks"
+enabled = true
+
+[categories.puri_roll_samosa]
+name = "Puri, Roll & Samosa"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/roll-samosa"
+enabled = true
+
+[categories.burgers]
+name = "Burgers"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/burgers"
+enabled = true
+
+[categories.naan_roti_parathas]
+name = "Naan, Roti & Parathas"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/parathas-roti"
+enabled = true
+
+[categories.cold_cuts_sausages]
+name = "Cold Cuts & Sausages"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/ready-to-eat"
+enabled = true
+
+[categories.dumplings_momos]
+name = "Dumplings & Momos"
+base_url = "https://www.naheed.pk/groceries-pets/frozen-food-ice-cream/dumplings"
+enabled = true
+
+# Dairy
+[categories.cheese_cream]
+name = "Cheese & Cream"
+base_url = "https://www.naheed.pk/groceries-pets/dairy/cheese"
+enabled = true
+
+[categories.milk_dairy_drinks]
+name = "Milk & Dairy Drinks"
+base_url = "https://www.naheed.pk/groceries-pets/dairy/milk-dairy-drinks"
+enabled = true
+
+[categories.butter_margarine]
+name = "Butter & Margarine"
+base_url = "https://www.naheed.pk/groceries-pets/dairy/butter-margarine"
+enabled = true
+
+[categories.non_dairy_milk]
+name = "Non-Dairy Milk"
+base_url = "https://www.naheed.pk/groceries-pets/dairy/non-dairy-milk"
+enabled = true
+
+[categories.yoghurt]
+name = "Yoghurt"
+base_url = "https://www.naheed.pk/groceries-pets/dairy/yoghurt"
+enabled = true
+
+# Food Staples
+[categories.instant_meals]
+name = "Instant Meals"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/instant-meals"
+enabled = true
+
+[categories.ready_to_eat]
+name = "Ready to Eat"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/ready-to-eat"
+enabled = true
+
+[categories.sauces_pickles]
+name = "Sauces & Pickles"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/sauces-pickles"
+enabled = true
+
+[categories.spices_recipes]
+name = "Spices & Recipes"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/spices-recipes"
+enabled = true
+
+[categories.canned_jarred_food]
+name = "Canned & Jarred Food"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/canned-jarred-food"
+enabled = true
+
+[categories.noodles_pasta]
+name = "Noodles & Pasta"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/noodles-pasta"
+enabled = true
+
+[categories.sugar_salt]
+name = "Sugar & Salt"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/sugar-salt"
+enabled = true
+
+[categories.beans_pulses]
+name = "Beans & Pulses"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/beans-pulses"
+enabled = true
+
+[categories.gluten_free]
+name = "Gluten Free"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/gluten-free"
+enabled = true
+
+[categories.soups_stocks]
+name = "Soups & Stocks"
+base_url = "https://www.naheed.pk/groceries-pets/food-staples/soups-stocks"
+enabled = true
+
+# Baking & Cooking
+[categories.home_baking]
+name = "Home Baking"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/home-baking"
+enabled = true
+
+[categories.nuts_seeds]
+name = "Nuts & Seeds"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/nuts-seeds"
+enabled = true
+
+[categories.cooking_oil]
+name = "Cooking Oil"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/cooking-oil"
+enabled = true
+
+[categories.olive_oil]
+name = "Olive Oil"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/olive-oil"
+enabled = true
+
+[categories.rice]
+name = "Rice"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/rice"
+enabled = true
+
+[categories.flours_meals]
+name = "Flours & Meals"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/flours-meals"
+enabled = true
+
+[categories.salad_dressings]
+name = "Salad Dressings"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/salad-dressings"
+enabled = true
+
+[categories.food_color_essence]
+name = "Food Color & Essence"
+base_url = "https://www.naheed.pk/groceries-pets/baking-cooking/food-color-essence"
+enabled = true
+
+#Bread & Bakery
+[categories.cake]
+name = "Cake"
+base_url = "https://www.naheed.pk/groceries-pets/bread-bakery/cake"
+enabled = true
+
+[categories.bread_buns]
+name = "Bread Buns"
+base_url = "https://www.naheed.pk/groceries-pets/bread-bakery/bread-buns"
+enabled = true
+
+[categories.wraps_pittas]
+name = "Wraps & Pittas"
+base_url = "https://www.naheed.pk/groceries-pets/bread-bakery/wraps-pittas"
+enabled = true
+
+[categories.sandwiches]
+name = "Sandwiches"
+base_url = "https://www.naheed.pk/groceries-pets/bread-bakery/sandwiches"
+enabled = true
+
+# Chocolates & Snacks
+[categories.snacks]
+name = "Snacks"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/snacks"
+enabled = true
+
+[categories.biscuits]
+name = "Biscuits"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/biscuits"
+enabled = true
+
+[categories.wafers]
+name = "Wafers"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/wafers"
+enabled = true
+
+[categories.chocolates]
+name = "Chocolates"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/chocolates"
+enabled = true
+
+[categories.popcorn]
+name = "Popcorn"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/popcorn"
+enabled = true
+
+[categories.chips]
+name = "Chips & Crisps"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/chips-crisps"
+enabled = true
+
+[categories.salsas_dips]
+name = "Salsas & Dips"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/salsas-dips"
+enabled = true
+
+[categories.dry_fruits]
+name = "Dry Fruits & Dates"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/dry-fruit-dates"
+enabled = true
+
+[categories.mouth_fresheners]
+name = "Mouth Fresheners"
+base_url = "https://www.naheed.pk/groceries-pets/chocolates-snacks/mouth-fresheners"
+enabled = true
+
+# Desserts
+[categories.traditional_desserts]
+name = "Traditional Desserts"
+base_url = "https://www.naheed.pk/groceries-pets/deserts/traditional-desserts"
+enabled = true
+
+[categories.syrups_toppings]
+name = "Syrups & Toppings"
+base_url = "https://www.naheed.pk/groceries-pets/deserts/syrups"
+enabled = true
+
+[categories.jelly_custard]
+name = "Jelly & Custard"
+base_url = "https://www.naheed.pk/groceries-pets/deserts/jelly-custard"
+enabled = true
+
+[categories.ice_cream]
+name = "Ice Cream"
+base_url = "https://www.naheed.pk/groceries-pets/deserts/ice-cream"
+enabled = true
+
+# Laundry & Household
+[categories.laundry]
+name = "Laundry"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/laundry"
+enabled = true
+
+[categories.shoe_care]
+name = "Shoe Care"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/shoe-care"
+enabled = true
+
+[categories.air_fresheners]
+name = "Air Fresheners"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/air-fresheners"
+enabled = true
+
+[categories.cloths_dusters]
+name = "Cloths & Dusters"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/cloths-dusters"
+enabled = true
+
+[categories.tissue_toilet_rolls]
+name = "Tissue & Toilet Rolls"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/tissue-toilet-rolls"
+enabled = true
+
+[categories.household_cleaners]
+name = "Household Cleaners"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/household-cleaners"
+enabled = true
+
+
+
+[categories.repellents_insecticides]
+name = "Repellents & Insecticides"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/repellents-insecticides"
+enabled = true
+
+[categories.trash_bags]
+name = "Trash Bags"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/trash-bags"
+enabled = true
+
+[categories.food_storage]
+name = "Food Storage"
+base_url = "https://www.naheed.pk/groceries-pets/laundry-household/food-storage"
+enabled = true
+
+# Breakfast
+[categories.eggs]
+name = "Eggs"
+base_url = "https://www.naheed.pk/groceries-pets/breakfast/eggs"
+enabled = true
+
+[categories.honey]
+name = "Honey"
+base_url = "https://www.naheed.pk/groceries-pets/breakfast/honey"
+enabled = true
+
+[categories.cereals]
+name = "Cereals"
+base_url = "https://www.naheed.pk/groceries-pets/breakfast/cereals"
+enabled = true
+
+[categories.muesli]
+name = "Muesli"
+base_url = "https://www.naheed.pk/groceries-pets/breakfast/muesli"
+enabled = true
+
+[categories.jams_spreads]
+name = "Jams & Spreads"
+base_url = "https://www.naheed.pk/groceries-pets/breakfast/jams-spreads"
+enabled = true
+
+[categories.oatmeals_porridge]
+name = "Oatmeals & Porridge"
+base_url = "https://www.naheed.pk/groceries-pets/breakfast/oatmeals-porridge"
+enabled = true
+
+# Beverages
+[categories.juices]
+name = "Juices"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/juices"
+enabled = true
+
+[categories.tea_coffee]
+name = "Tea & Coffee"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/tea-coffee"
+enabled = true
+
+[categories.chocolate_drinks]
+name = "Chocolate Drinks"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/chocolate-drinks"
+enabled = true
+
+[categories.powdered_drinks]
+name = "Powdered Drinks"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/powdered-drinks"
+enabled = true
+
+[categories.squash_syrup_flavors]
+name = "Squash, Syrup & Flavors"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/squash-syrup-flavors"
+enabled = true
+
+[categories.drinking_water]
+name = "Drinking Water"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/drinking-water"
+enabled = true
+
+[categories.soft_drinks_soda]
+name = "Soft Drinks & Soda"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/soft-drinks-soda"
+enabled = true
+
+[categories.energy_drinks]
+name = "Energy Drinks"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/energy-drinks"
+enabled = true
+
+[categories.smoothies]
+name = "Smoothies"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/smoothies"
+enabled = true
+
+[categories.whiteners_sweetener]
+name = "Whiteners & Sweetener"
+base_url = "https://www.naheed.pk/groceries-pets/beverages/whiteners-sweetener"
+enabled = true
+
+# Field mapping for data extraction
+[fields]
+# These map to the canonical schema used by JsonFlattener
+product_name = "name"
+product_price = "cost_price"
+product_id = "product_id"
+category = "category_name"
+sku = "sku"
+units = "units_of_mass"
+
+# Extraction rules specific to Naheed
+[extraction_rules]
+# Price extraction patterns
+price_patterns = [
+    "Rs\\.?\\s*[\\d,]+",
+    "PKR\\.?\\s*[\\d,]+",
+    "₨\\.?\\s*[\\d,]+",
+    "\\d+\\s*Rs"
+]
+
+# Product ID extraction
+# Based on your sample: data-product-id="114062"
+product_id_attributes = [
+    "data-product-id",
+    "data-id",
+    "id"
+]
+
+# Price amount extraction
+# Based on your sample: data-price-amount="2100"
+price_amount_attributes = [
+    "data-price-amount",
+    "data-price",
+    "data-cost"
+]
+
+# Units extraction from product names
+unit_patterns = [
+    "\\d+\\s*(kg|kilogram)",
+    "\\d+\\s*(g|gram|gm)",
+    "\\d+\\s*(ml|milliliter)",
+    "\\d+\\s*(l|liter|litre)",
+    "\\d+\\s*(piece|pcs)",
+    "\\d+\\s*(pack|packet)",
+    "\\d+\\s*(dozen)"
+]
+
+# Exclusion rules
+[exclusion]
+excluded_sections = [
+    "header",
+    "footer",
+    "nav",
+    "advertisement",
+    "sidebar",
+    "breadcrumb",
+    "pagination"
+]
+
+excluded_keywords = [
+    "advertisement",
+    "sponsored",
+    "banner",
+    "footer",
+    "header",
+    "navigation",
+    "menu",
+    "breadcrumb",
+    "pagination",
+    "filter",
+    "sort",
+    "view all",
+    "show more",
+    "load more"
+]
+
+# ML model configuration (for future enhancement)
+[ml_model]
+enabled = false
+confidence_threshold = 0.7
+model_path = "models/naheed_product_classifier.bin"
+training_data_path = "training_data/naheed_training.json"
+
+# Rate limiting and anti-bot measures
+[anti_bot]
+random_delay_min_ms = 500
+random_delay_max_ms = 2000
+user_agents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+]
+
+# Headers to mimic real browser requests
+[headers]
+Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+"Accept-Language" = "en-US,en;q=0.9,ur;q=0.8"
+"Accept-Encoding" = "gzip, deflate, br"
+"Cache-Control" = "max-age=0"
+"Upgrade-Insecure-Requests" = "1"
+"Sec-Fetch-Dest" = "document"
+"Sec-Fetch-Mode" = "navigate"
+"Sec-Fetch-Site" = "none"
+"Sec-Fetch-User" = "?1"

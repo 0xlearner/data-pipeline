@@ -1,0 +1,135 @@
+# Global Concurrency Configuration for Data Pipeline
+# This file controls HTTP client behavior, retry logic, rate limiting, and concurrency across all scrapers
+
+[http]
+# HTTP client settings
+timeout_seconds = 30
+connect_timeout_seconds = 10
+read_timeout_seconds = 30
+max_redirects = 5
+http2 = true
+cookies = true
+# user_agent = "Custom User Agent"  # Optional custom user agent
+
+# Default headers to include with all requests
+[http.default_headers]
+"Accept" = "application/json, text/html, */*"
+"Accept-Language" = "en-US,en;q=0.9"
+"Accept-Encoding" = "gzip, deflate, br"
+"Cache-Control" = "no-cache"
+"Pragma" = "no-cache"
+
+[retry]
+# Global retry configuration
+max_attempts = 3
+base_delay_ms = 500
+max_delay_seconds = 30
+backoff_multiplier = 2.0
+jitter = true
+retryable_status_codes = [408, 429, 500, 502, 503, 504]
+retry_on_connection_error = true
+retry_on_timeout = true
+
+[rate_limit]
+# Global rate limiting configuration
+enabled = true
+requests_per_second = 10.0
+burst_size = 5
+strategy = "token_bucket"
+
+# Per-domain rate limits (override global settings for specific domains)
+[rate_limit.domain_limits]
+"www.bazaarapp.com" = { requests_per_second = 5.0, burst_size = 3, enabled = true }
+"pandamart.foodpanda.pk" = { requests_per_second = 8.0, burst_size = 4, enabled = true }
+"www.naheed.pk" = { requests_per_second = 6.0, burst_size = 3, enabled = true }
+"kravemart.com" = { requests_per_second = 7.0, burst_size = 4, enabled = true }
+"dealcart.pk" = { requests_per_second = 12.0, burst_size = 6, enabled = true }
+
+[emulation]
+# Browser emulation configuration
+strategy = "modern_browsers"
+rotate_user_agents = false
+browsers = [
+    "chrome_137",
+    "chrome_136",
+    "chrome_135",
+    "firefox_139",
+    "firefox_136",
+    "firefox_135",
+    "edge_134",
+    "safari_18_5"
+]
+custom_user_agents = []
+
+[concurrency]
+# Concurrency limits and connection pooling
+max_concurrent_requests = 5
+max_concurrent_per_domain = 2
+max_connections = 100
+max_idle_connections = 20
+idle_timeout_seconds = 60
+http2_multiplexing = true
+
+# Per-source configuration overrides
+# These override global settings for specific scrapers
+
+[source_overrides.bazaarapp]
+# BazaarApp specific configuration - more conservative due to API sensitivity
+[source_overrides.bazaarapp.retry]
+max_attempts = 2
+base_delay_ms = 1000
+max_delay_seconds = 15
+
+[source_overrides.bazaarapp.rate_limit]
+requests_per_second = 3.0
+burst_size = 2
+
+[source_overrides.bazaarapp.concurrency]
+max_concurrent_per_domain = 3
+
+[source_overrides.pandamart]
+# Pandamart GraphQL API configuration
+[source_overrides.pandamart.http]
+timeout_seconds = 45
+
+[source_overrides.pandamart.retry]
+max_attempts = 4
+base_delay_ms = 800
+
+[source_overrides.pandamart.emulation]
+strategy = "chrome_variants"
+
+[source_overrides.naheed]
+# Naheed HTML scraping configuration
+[source_overrides.naheed.http]
+timeout_seconds = 25
+
+[source_overrides.naheed.rate_limit]
+requests_per_second = 4.0
+burst_size = 2
+
+[source_overrides.naheed.emulation]
+strategy = "rotate"
+browsers = ["chrome_137", "chrome_136", "firefox_139", "firefox_136"]
+
+[source_overrides.kravemart]
+# KraveMart API configuration - can handle higher rates
+[source_overrides.kravemart.rate_limit]
+requests_per_second = 8.0
+burst_size = 5
+
+[source_overrides.kravemart.concurrency]
+max_concurrent_per_domain = 6
+
+[source_overrides.dealcart]
+# DealCart configuration - most permissive
+[source_overrides.dealcart.rate_limit]
+requests_per_second = 15.0
+burst_size = 8
+
+[source_overrides.dealcart.retry]
+max_attempts = 2
+base_delay_ms = 300
+
+[source_overrides.dealcart.concurrency]
+max_concurrent_per_domain = 8

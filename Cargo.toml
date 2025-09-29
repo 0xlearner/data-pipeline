@@ -4,44 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "count_products"
-path = "src/bin/count_products.rs"
-
-[[bin]]
-name = "test_full_pipeline"
-path = "src/bin/test_full_pipeline.rs"
-
-[[bin]]
-name = "compare_api_data"
-path = "src/bin/compare_api_data.rs"
-
-[[bin]]
-name = "debug_columns"
-path = "src/bin/debug_columns.rs"
-
-[[bin]]
-name = "verify_column_fix"
-path = "src/bin/verify_column_fix.rs"
-
-[[bin]]
-name = "test_data_cleaning"
-path = "src/bin/test_data_cleaning.rs"
-
-[[bin]]
-name = "test_real_data_cleaning"
-path = "src/bin/test_real_data_cleaning.rs"
-
-[[bin]]
-name = "test_unified_pipeline"
-path = "src/bin/test_unified_pipeline.rs"
-
-[[bin]]
-name = "test_pagination_robustness"
-path = "src/bin/test_pagination_robustness.rs"
-
-[[bin]]
-name = "test_pandamart"
-path = "src/bin/test_pandamart.rs"
+name = "pipeline-tools"
+path = "src/bin/pipeline-tools.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -62,7 +26,9 @@ anyhow = "1.0"
 config = "0.15.16"
 async-trait = "0.1"
 futures = "0.3"
+url = "2.5"
 dotenv = "0.15"
+clap = { version = "4.0", features = ["derive"] }
 # HTML processing dependencies
 scraper = "0.20"
 smartcore = "0.3"

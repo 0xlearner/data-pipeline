@@ -94,7 +94,10 @@ impl FieldClassifier {
         let field_lower = field_name.to_lowercase();
 
         // Check field name patterns first (order matters!)
-        if field_lower.contains("sku") && !field_lower.contains("percent") && !field_lower.contains("off") {
+        if field_lower.contains("sku")
+            && !field_lower.contains("percent")
+            && !field_lower.contains("off")
+        {
             return "sku".to_string();
         }
 
@@ -188,7 +191,6 @@ impl FieldClassifier {
             && !value.contains(".")
     }
 
-    #[allow(dead_code)]
     pub fn add_field_mapping(&mut self, from: String, to: String) {
         self.field_mappings.insert(from, to);
     }
@@ -231,7 +233,6 @@ impl FieldClassifier {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn get_canonical_fields(&self) -> Vec<String> {
         let mut canonical_fields: Vec<String> = self.field_mappings.values().cloned().collect();
         canonical_fields.sort();
@@ -239,7 +240,6 @@ impl FieldClassifier {
         canonical_fields
     }
 
-    #[allow(dead_code)]
     pub fn is_canonical_field(&self, field_name: &str) -> bool {
         self.field_mappings.values().any(|v| v == field_name)
     }
@@ -318,13 +318,17 @@ mod tests {
 
         // Test that product_price maps to mrp (maximum retail price)
         assert_eq!(
-            classifier.classify_field("product_price", &["390.00".to_string()]).unwrap(),
+            classifier
+                .classify_field("product_price", &["390.00".to_string()])
+                .unwrap(),
             "mrp"
         );
 
         // Test that special_price maps to cost_price (actual selling price)
         assert_eq!(
-            classifier.classify_field("special_price", &["234.00".to_string()]).unwrap(),
+            classifier
+                .classify_field("special_price", &["234.00".to_string()])
+                .unwrap(),
             "cost_price"
         );
 
@@ -346,27 +350,30 @@ mod tests {
 
         // Test that sku maps to sku (not discount)
         assert_eq!(
-            classifier.classify_field("sku", &["TEST123".to_string()]).unwrap(),
+            classifier
+                .classify_field("sku", &["TEST123".to_string()])
+                .unwrap(),
             "sku"
         );
 
         // Test that sku_percent_off maps to discount
         assert_eq!(
-            classifier.classify_field("sku_percent_off", &["25% off".to_string()]).unwrap(),
+            classifier
+                .classify_field("sku_percent_off", &["25% off".to_string()])
+                .unwrap(),
             "discount"
         );
 
         // Test that product_id maps to product_id
         assert_eq!(
-            classifier.classify_field("product_id", &["12345".to_string()]).unwrap(),
+            classifier
+                .classify_field("product_id", &["12345".to_string()])
+                .unwrap(),
             "product_id"
         );
 
         // Test normalization works
-        assert_eq!(
-            classifier.classify_field("SKU", &[]).unwrap(),
-            "sku"
-        );
+        assert_eq!(classifier.classify_field("SKU", &[]).unwrap(), "sku");
 
         assert_eq!(
             classifier.classify_field("Product-ID", &[]).unwrap(),

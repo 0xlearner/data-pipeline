@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use tracing::{info, warn};
 
-use crate::fetcher::html_fetcher::ScrapedProduct;
+use crate::extractor::ScrapedProduct;
 
 /// HTML-specific processor that converts scraped products to JSON format
 /// for unified processing through the existing pipeline
@@ -24,8 +24,17 @@ impl HtmlProcessor {
         let mut processed_products = Vec::new();
         let mut successful_count = 0;
         let mut failed_count = 0;
+        let original_count = products.len();
 
-        for (index, product) in products.iter().enumerate() {
+        // First filter products using validation
+        let filtered_products = self.filter_products(products);
+        info!(
+            "Filtered {} products from {} total",
+            filtered_products.len(),
+            original_count
+        );
+
+        for (index, product) in filtered_products.iter().enumerate() {
             match self.convert_to_json(product) {
                 Ok(json_product) => {
                     processed_products.push(json_product);
@@ -37,7 +46,10 @@ impl HtmlProcessor {
                         "Failed to convert scraped product at index {} to JSON: {}",
                         index, e
                     );
-                    warn!("Failed product: {} (ID: {})", product.name, product.product_id);
+                    warn!(
+                        "Failed product: {} (ID: {})",
+                        product.name, product.product_id
+                    );
                 }
             }
         }
@@ -51,7 +63,7 @@ impl HtmlProcessor {
     }
 
     /// Convert a single scraped product to JSON format
-    fn convert_to_json(&self, product: &ScrapedProduct) -> Result<Value> {
+    pub fn convert_to_json(&self, product: &ScrapedProduct) -> Result<Value> {
         // Validate required fields
         if product.name.is_empty() {
             return Err(anyhow!("Product name is empty"));
@@ -247,7 +259,7 @@ impl HtmlProcessor {
     /// Extract brand from product name (first word or known brands)
     fn extract_brand_from_name(&self, name: &str) -> Option<String> {
         let words: Vec<&str> = name.split_whitespace().collect();
-        
+
         if words.is_empty() {
             return None;
         }
@@ -308,9 +320,18 @@ mod tests {
     fn test_units_extraction() {
         let processor = HtmlProcessor::new();
 
-        assert_eq!(processor.extract_units_from_name("Onion 1 kg"), Some("kg".to_string()));
-        assert_eq!(processor.extract_units_from_name("Milk 500 ml"), Some("ml".to_string()));
-        assert_eq!(processor.extract_units_from_name("Eggs 1 dozen"), Some("dozen".to_string()));
+        assert_eq!(
+            processor.extract_units_from_name("Onion 1 kg"),
+            Some("kg".to_string())
+        );
+        assert_eq!(
+            processor.extract_units_from_name("Milk 500 ml"),
+            Some("ml".to_string())
+        );
+        assert_eq!(
+            processor.extract_units_from_name("Eggs 1 dozen"),
+            Some("dozen".to_string())
+        );
         assert_eq!(processor.extract_units_from_name("Simple Product"), None);
     }
 
@@ -355,7 +376,7 @@ mod tests {
         };
 
         let json = processor.convert_to_json(&product).unwrap();
-        
+
         assert_eq!(json["name"], "Fresh Bananas");
         assert_eq!(json["price"], "150");
         assert_eq!(json["product_id"], "12345");
