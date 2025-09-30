@@ -12,6 +12,7 @@ use crate::traits::data_source::{
 pub struct ApiSourceAdapter {
     fetcher: ApiFetcher,
     config: ApiConfig,
+    #[allow(dead_code)] // Used indirectly through the fetcher's storage mode
     storage: Option<std::sync::Arc<crate::storage::MinioStorage>>,
 }
 
@@ -143,6 +144,7 @@ impl ConfigurableSource for ApiSourceAdapter {
 pub struct HtmlSourceAdapter {
     fetcher: HtmlFetcher,
     config: HtmlConfig,
+    #[allow(dead_code)] // Used indirectly through the fetcher's storage mode
     storage: Option<std::sync::Arc<crate::storage::MinioStorage>>,
 }
 

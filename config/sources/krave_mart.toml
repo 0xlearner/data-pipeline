@@ -5,9 +5,10 @@ auth_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2sycHJvZ
 
 [request]
 method = "GET"
-authorization = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2sycHJvZHVjdHMua3JhdmVtYXJ0LmNvbS9hcGkvbG9naW4iLCJpYXQiOjE3NTc5Mjc0NzUsImV4cCI6MTc1ODEwMDI3NSwibmJmIjoxNzU3OTI3NDc1LCJqdGkiOiI5NFU4NVVMRnRkVkNhVm1VIiwic3ViIjoiMiIsInBydiI6IjBiZjZjNzFmN2MzOWI4MWEyYzFiNzUxNjBjOWRhMmU1N2MyZmVkNjYifQ.M687M3d_SCSUzZR3lMsnZnDKdTMKjCCTbX_ZtPM4blM"
 
 [request.headers]
+User-Agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+Authorization = "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL2sycHJvZHVjdHMua3JhdmVtYXJ0LmNvbS9hcGkvbG9naW4iLCJpYXQiOjE3NTkyNDc0NTUsImV4cCI6MTc1OTQyMDI1NSwibmJmIjoxNzU5MjQ3NDU1LCJqdGkiOiJKS3BPeDd3UTFoYTk1M3Q1Iiwic3ViIjoiMiIsInBydiI6IjBiZjZjNzFmN2MzOWI4MWEyYzFiNzUxNjBjOWRhMmU1N2MyZmVkNjYifQ.2drn2lvNxoZ_n3g9vi1qStehbz9tdyzdV31e6LGIe38" 
 
 [response]
 data_path = "data[].l2_products"
@@ -23,11 +24,8 @@ default_limit = 100
 target_fields = ["cost_price", "mrp", "name", "sku_percent_off", "category_name"]
 
 [categories]
-# Fruits & Vegetables
-fruits_veg = { name = "Fruits & Vegetables", category_ids = "2417,2738,2418,2419,4355,2778,4119,2772,4538" }
-
-# New Arrival
-new_arrival = { name = "New Arrival", category_ids = "4660,4565,4767,4628,4528,4882,4858,4971" }
+# Tea & Coffee (for testing multi-category logic)
+tea_coffee_sugar = { name = "Tea & Coffee", category_ids = "2431,2386,2433,2432,2478,2430" }
 
 # Flash Deals
 flash_deals = { name = "Flash Deals", category_ids = "2866,4946,4391,4708,3609,3272,4396,3793" }
@@ -91,9 +89,6 @@ atta_daal_chaawal = { name = "Atta, Daal, Chaawal", category_ids = "2383,2381,23
 
 # Oil & Ghee
 oil_ghee = { name = "Oil & Ghee", category_ids = "2378,2379,2380" }
-
-# Tea, Coffee & Sugar
-tea_coffee_sugar = { name = "Tea, Coffee & Sugar", category_ids = "2431,2386,2433,2432,2478,2430" }
 
 # Hair Care
 hair_care = { name = "Hair Care", category_ids = "2465,4623,4624,4625,4626,4627" }

@@ -319,6 +319,31 @@ impl MinioStorage {
         Ok(data)
     }
 
+    /// Load and parse raw JSON data from ALL files for an API source (for multi-category sources)
+    pub async fn load_all_raw_data(&self, api_name: &str) -> Result<Vec<serde_json::Value>> {
+        let raw_files = self.list_raw_files(api_name).await?;
+
+        if raw_files.is_empty() {
+            return Err(anyhow!("No raw data files found for API: {}", api_name));
+        }
+
+        let file_count = raw_files.len();
+        info!("Loading raw data from {} files for: {}", file_count, api_name);
+        let mut all_data = Vec::new();
+
+        for file_key in raw_files {
+            info!("Loading raw data from: {}", file_key);
+            let json_str = self.get_raw_json(&file_key).await?;
+            let data: Vec<serde_json::Value> = serde_json::from_str(&json_str)
+                .map_err(|e| anyhow!("Failed to parse JSON data from {}: {}", file_key, e))?;
+
+            all_data.extend(data);
+        }
+
+        info!("Loaded total {} raw API responses from {} files", all_data.len(), file_count);
+        Ok(all_data)
+    }
+
     /// Stream raw JSON data in batches from the most recent file for an API source
     /// This is memory-efficient for large datasets
     pub async fn stream_latest_raw_data_batched(

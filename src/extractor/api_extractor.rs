@@ -48,6 +48,27 @@ impl ApiExtractor {
             return Ok(products);
         }
 
+
+
+        // Handle array of API responses (from storage mode)
+        if let Value::Array(api_responses) = data {
+            let mut all_products = Vec::new();
+
+            for api_response in api_responses {
+                // Extract products from each individual API response
+                let products = self.extract_from_single_response(api_response)?;
+                all_products.extend(products);
+            }
+
+            return Ok(all_products);
+        }
+
+        // Handle single API response
+        self.extract_from_single_response(data)
+    }
+
+    /// Extract products from a single API response
+    fn extract_from_single_response(&self, data: &Value) -> Result<Vec<Value>> {
         // Try different extraction patterns based on configuration
         if let Some(ref extraction_path) = self.config.response.data_path {
             let extracted = self.extract_by_path(data, extraction_path)?;
@@ -67,6 +88,8 @@ impl ApiExtractor {
         // Fallback to common patterns
         self.extract_by_common_patterns(data)
     }
+
+
 
     /// Extract data using configured path
     pub fn extract_by_path(&self, data: &Value, path: &str) -> Result<Vec<Value>> {

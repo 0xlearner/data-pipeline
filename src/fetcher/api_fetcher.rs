@@ -1,3 +1,4 @@
+
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use std::sync::Arc;
@@ -104,10 +105,27 @@ impl ApiFetcher {
 
     pub async fn fetch_all_categories(&self) -> Result<Vec<Value>> {
         if self.storage_mode {
-            self.fetch_store_and_extract_all_categories().await
+            // In storage mode, only fetch and store - don't extract
+            // Extraction should be handled by the pipeline/extractor layer
+            return Err(anyhow!("Storage mode should not extract products in fetcher. Use fetch_and_store_only() instead."));
         } else {
             self.fetch_all_categories_direct().await
         }
+    }
+
+    /// Fetch and store all categories (storage mode) - returns storage keys, not products
+    pub async fn fetch_and_store_only(&self) -> Result<Vec<FetchedApiResponse>> {
+        if !self.storage_mode {
+            return Err(anyhow!("fetch_and_store_only() can only be used in storage mode"));
+        }
+
+        info!("🔄 Starting fetch and store (no extraction)");
+
+        // Only do Stage 1: Fetch and store all API responses
+        let fetched_responses = self.fetch_and_store_all_categories().await?;
+        info!("📄 Fetch and store complete: Stored {} API responses", fetched_responses.len());
+
+        Ok(fetched_responses)
     }
 
     /// Fetch all categories directly (original behavior)
@@ -192,25 +210,7 @@ impl ApiFetcher {
         Ok(all_data)
     }
 
-    /// Fetch all categories using two-stage processing (fetch → store → extract)
-    async fn fetch_store_and_extract_all_categories(&self) -> Result<Vec<Value>> {
-        info!("🔄 Starting two-stage API processing");
 
-        // Stage 1: Fetch and store all API responses
-        let fetched_responses = self.fetch_and_store_all_categories().await?;
-        info!("📄 Stage 1 complete: Stored {} API responses", fetched_responses.len());
-
-        // Stage 2: Extract products from stored responses
-        let mut all_products = Vec::new();
-        for response in fetched_responses {
-            let products = self.extract_products(&response.response_data)?;
-            info!("📊 Extracted {} products from {}", products.len(), response.category_key);
-            all_products.extend(products);
-        }
-
-        info!("✅ Stage 2 complete: Extracted {} total products", all_products.len());
-        Ok(all_products)
-    }
 
     /// Stage 1: Fetch and store all API responses
     async fn fetch_and_store_all_categories(&self) -> Result<Vec<FetchedApiResponse>> {
@@ -494,13 +494,67 @@ impl ApiFetcher {
         let storage = self.storage.as_ref()
             .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
 
-        // Fetch all pages and combine them
-        let all_products = self.fetch_get_paginated(url).await?;
+        info!("📥 Fetching paginated GET requests from: {}", url);
 
-        // Create a combined response
-        let combined_data = Value::Array(all_products);
+        let mut all_raw_responses = Vec::new();
+        let mut page = 1;
+        let max_pages = 50; // Safety limit to prevent infinite loops
 
-        // Store the combined JSON response
+        loop {
+            // Safety check to prevent infinite loops
+            if page > max_pages {
+                warn!(
+                    "Reached maximum page limit ({}) for URL {}, stopping",
+                    max_pages, url
+                );
+                break;
+            }
+
+            let paginated_url = format!("{}?page={}", url, page);
+            info!("📥 Fetching GET page {} from: {}", page, paginated_url);
+
+            // Handle potential API errors gracefully
+            let raw_data = match self.fetch_with_get(&paginated_url).await {
+                Ok(json) => json,
+                Err(e) => {
+                    warn!(
+                        "Failed to fetch page {} from {}: {}",
+                        page, paginated_url, e
+                    );
+                    // Don't stop for a single failure, but break if it continues
+                    if page > 1 {
+                        // if it's not the first page, we can probably stop
+                        break;
+                    }
+                    page += 1;
+                    sleep(Duration::from_millis(500)).await;
+                    continue;
+                }
+            };
+
+            // Store the raw API response as-is
+            all_raw_responses.push(raw_data.clone());
+
+            // Check if there are more pages using the extractor
+            if !self.extractor.has_more_pages(&raw_data, page) {
+                break;
+            }
+
+            page += 1;
+
+            // Rate limiting
+            sleep(Duration::from_millis(500)).await;
+        }
+
+        info!(
+            "📥 Completed pagination: {} raw API responses fetched",
+            all_raw_responses.len()
+        );
+
+        // Create a combined response containing all raw API responses
+        let combined_data = Value::Array(all_raw_responses.clone());
+
+        // Store the combined raw JSON responses
         let json_str = serde_json::to_string_pretty(&combined_data)?;
         let storage_key = storage.store_raw_json_with_category(&self.config.api.name, category_key, &json_str).await?;
 
@@ -542,13 +596,98 @@ impl ApiFetcher {
         let storage = self.storage.as_ref()
             .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
 
-        // Fetch all pages and combine them
-        let all_products = self.fetch_post_paginated(category_slug).await?;
+        info!("📥 Fetching paginated POST requests for category: {}", category_slug);
 
-        // Create a combined response
-        let combined_data = Value::Array(all_products);
+        let mut all_raw_responses = Vec::new();
+        let mut page = 0; // BazaarApp uses 0-based pagination
+        let mut consecutive_empty_pages = 0;
+        let max_consecutive_empty = 2; // Stop after 2 consecutive empty responses
+        let max_pages = 50; // Safety limit to prevent infinite loops
 
-        // Store the combined JSON response
+        loop {
+            // Safety check to prevent infinite loops
+            if page >= max_pages {
+                warn!(
+                    "Reached maximum page limit ({}) for category {}, stopping",
+                    max_pages, category_slug
+                );
+                break;
+            }
+
+            info!("📥 Fetching POST page {} for category {}", page, category_slug);
+
+            let request_body = self
+                .config
+                .build_pagination_request_body(category_slug, page)?;
+
+            // Handle potential API errors gracefully
+            let raw_data = match self.fetch_with_post(&request_body).await {
+                Ok(json) => json,
+                Err(e) => {
+                    warn!(
+                        "Failed to fetch page {} for category {}: {}",
+                        page, category_slug, e
+                    );
+                    consecutive_empty_pages += 1;
+                    if consecutive_empty_pages >= max_consecutive_empty {
+                        info!(
+                            "Too many consecutive failures, stopping pagination for category {}",
+                            category_slug
+                        );
+                        break;
+                    }
+                    page += 1;
+                    sleep(Duration::from_millis(500)).await;
+                    continue;
+                }
+            };
+
+            // Store the raw API response as-is
+            all_raw_responses.push(raw_data.clone());
+
+            // Check if this page has products to determine if we should continue
+            let products = self.extract_products(&raw_data)?;
+            if products.is_empty() {
+                consecutive_empty_pages += 1;
+                info!(
+                    "No products found on page {} for category {} (consecutive empty: {})",
+                    page, category_slug, consecutive_empty_pages
+                );
+
+                if consecutive_empty_pages >= max_consecutive_empty {
+                    info!(
+                        "Reached {} consecutive empty pages, stopping pagination for category {}",
+                        max_consecutive_empty, category_slug
+                    );
+                    break;
+                }
+            } else {
+                // Reset consecutive empty counter when we find products
+                consecutive_empty_pages = 0;
+                info!(
+                    "Found {} products on page {} for category {}",
+                    products.len(),
+                    page,
+                    category_slug
+                );
+            }
+
+            page += 1;
+
+            // Rate limiting
+            sleep(Duration::from_millis(500)).await;
+        }
+
+        info!(
+            "📥 Completed pagination for category {}: {} raw API responses fetched",
+            category_slug,
+            all_raw_responses.len()
+        );
+
+        // Create a combined response containing all raw API responses
+        let combined_data = Value::Array(all_raw_responses.clone());
+
+        // Store the combined raw JSON responses
         let json_str = serde_json::to_string_pretty(&combined_data)?;
         let storage_key = storage.store_raw_json_with_category(&self.config.api.name, category_key, &json_str).await?;
 

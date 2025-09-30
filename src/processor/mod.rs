@@ -1,6 +1,9 @@
 pub mod field_classifier;
 pub mod html_processor;
 pub mod json_flattener;
+pub mod preprocessors;
+pub mod field_extractors;
+pub mod dataframe_builder;
 pub mod rule_normalizer;
 pub mod stages;
 

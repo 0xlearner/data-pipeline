@@ -205,15 +205,7 @@ impl PipelineOrchestrator {
         Ok(Box::new(adapter))
     }
 
-    /// Create a storage-enabled API source for two-stage processing
-    async fn create_api_source_with_storage(&self, source_def: &SourceDefinition) -> Result<Box<dyn DataSource>> {
-        let api_config = ApiConfig::from_file(&source_def.config_path).with_context(|| {
-            format!("Failed to load API config from {}", source_def.config_path)
-        })?;
 
-        let adapter = ApiSourceAdapter::new_with_storage(api_config, self.minio_storage.clone()).await?;
-        Ok(Box::new(adapter))
-    }
 
     /// Process HTML source using two-stage approach (fetch → store → scrape)
     async fn process_html_source_two_stage(
@@ -280,26 +272,41 @@ impl PipelineOrchestrator {
     }
 
     /// Process API source using two-stage approach (fetch → store → extract)
-    async fn process_api_source_two_stage(
+    async fn process_api_source(
         &self,
         source_def: &SourceDefinition,
         context: &PipelineContext,
     ) -> Result<TraitPipelineResult> {
         info!("🔄 Starting two-stage API processing for: {}", source_def.name);
 
-        // Create storage-enabled API source
-        let api_source = self.create_api_source_with_storage(source_def).await?;
+        // Load API config
+        let api_config = ApiConfig::from_file(&source_def.config_path).with_context(|| {
+            format!("Failed to load API config from {}", source_def.config_path)
+        })?;
 
-        // Fetch data using the storage-enabled source (this will do fetch → store → extract)
-        let raw_source_data = api_source.fetch_all().await?;
+        // Stage 1: Fetch and store raw API responses (no extraction)
+        info!("📥 Stage 1: Fetching and storing raw API responses");
+        let fetcher = crate::fetcher::ApiFetcher::new_with_storage(api_config.clone(), self.minio_storage.clone()).await?;
+        let _fetched_responses = fetcher.fetch_and_store_only().await?;
+        info!("✅ Stage 1 complete: Raw API responses stored");
 
-        // Convert RawSourceData to RawData
-        let raw_data = match raw_source_data {
-            RawSourceData::Json(products) => {
-                crate::pipeline::unified_pipeline::RawData::Json(products)
-            }
-            _ => return Err(anyhow::anyhow!("Expected JSON data from API source")),
-        };
+        // Stage 2: Load stored raw data and extract products
+        info!("🔄 Stage 2: Loading stored data and extracting products");
+        let stored_raw_data = self.minio_storage.load_all_raw_data(&source_def.name).await?;
+
+        // Extract products using the API extractor
+        let extractor = crate::extractor::ApiExtractor::new(api_config);
+        let mut all_products = Vec::new();
+
+        for raw_response in &stored_raw_data {
+            let products = extractor.extract_products(raw_response)?;
+            all_products.extend(products);
+        }
+
+        info!("✅ Stage 2 complete: Extracted {} products", all_products.len());
+
+        // Convert to RawData for pipeline processing
+        let raw_data = crate::pipeline::unified_pipeline::RawData::Json(all_products);
 
         // Process the data through the pipeline stages
         let temp_pipeline = crate::pipeline::unified_pipeline::UnifiedPipeline::new(
@@ -413,7 +420,7 @@ impl PipelineOrchestrator {
                 self.process_html_source_two_stage(&source_def, &context).await
             } else if source_def.source_type == SourceType::Json {
                 // For API sources, use two-stage processing (fetch → store → extract)
-                self.process_api_source_two_stage(&source_def, &context).await
+                self.process_api_source(&source_def, &context).await
             } else {
                 self.pipeline.execute(context).await
             };
