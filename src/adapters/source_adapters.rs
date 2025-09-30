@@ -12,12 +12,29 @@ use crate::traits::data_source::{
 pub struct ApiSourceAdapter {
     fetcher: ApiFetcher,
     config: ApiConfig,
+    storage: Option<std::sync::Arc<crate::storage::MinioStorage>>,
 }
 
 impl ApiSourceAdapter {
     pub async fn new(config: ApiConfig) -> Result<Self> {
         let fetcher = ApiFetcher::new_async(config.clone()).await?;
-        Ok(Self { fetcher, config })
+        Ok(Self {
+            fetcher,
+            config,
+            storage: None,
+        })
+    }
+
+    pub async fn new_with_storage(
+        config: ApiConfig,
+        storage: std::sync::Arc<crate::storage::MinioStorage>
+    ) -> Result<Self> {
+        let fetcher = ApiFetcher::new_with_storage(config.clone(), storage.clone()).await?;
+        Ok(Self {
+            fetcher,
+            config,
+            storage: Some(storage),
+        })
     }
 }
 
@@ -104,7 +121,11 @@ impl ConfigurableSource for ApiSourceAdapter {
         // For synchronous compatibility, we'll use the blocking version
         // This should only be used in non-async contexts
         let fetcher = ApiFetcher::new(config.clone())?;
-        Ok(Self { fetcher, config })
+        Ok(Self {
+            fetcher,
+            config,
+            storage: None,
+        })
     }
 
     fn update_config(&mut self, config: Self::Config) -> Result<()> {
@@ -122,12 +143,42 @@ impl ConfigurableSource for ApiSourceAdapter {
 pub struct HtmlSourceAdapter {
     fetcher: HtmlFetcher,
     config: HtmlConfig,
+    storage: Option<std::sync::Arc<crate::storage::MinioStorage>>,
 }
 
 impl HtmlSourceAdapter {
     pub async fn new(config: HtmlConfig) -> Result<Self> {
         let fetcher = HtmlFetcher::new_async(config.clone()).await?;
-        Ok(Self { fetcher, config })
+        Ok(Self {
+            fetcher,
+            config,
+            storage: None,
+        })
+    }
+
+    pub async fn new_with_storage(
+        config: HtmlConfig,
+        storage: std::sync::Arc<crate::storage::MinioStorage>
+    ) -> Result<Self> {
+        let fetcher = HtmlFetcher::new_with_storage(config.clone(), storage.clone()).await?;
+        Ok(Self {
+            fetcher,
+            config,
+            storage: Some(storage),
+        })
+    }
+
+    /// Fetch data from storage instead of live scraping
+    pub async fn fetch_from_storage(&self) -> Result<RawSourceData> {
+        use crate::fetcher::HtmlPageProcessor;
+
+        let storage = self.storage.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Storage not configured for HTML source adapter"))?;
+
+        let processor = HtmlPageProcessor::new(self.config.clone(), storage.clone())?;
+        let products = processor.process_all_stored_pages().await?;
+
+        Ok(RawSourceData::Html(products))
     }
 }
 
@@ -142,8 +193,15 @@ impl DataSource for HtmlSourceAdapter {
     }
 
     async fn fetch_all(&self) -> Result<RawSourceData> {
-        let data = self.fetcher.fetch_all_categories().await?;
-        Ok(RawSourceData::Html(data))
+        if self.storage.is_some() {
+            // Storage mode: fetch HTML, store, then scrape from storage
+            let data = self.fetcher.fetch_all_categories().await?;
+            Ok(RawSourceData::Html(data))
+        } else {
+            // Direct mode: fetch and scrape immediately
+            let data = self.fetcher.fetch_all_categories().await?;
+            Ok(RawSourceData::Html(data))
+        }
     }
 
     async fn fetch_category(&self, category: &str) -> Result<RawSourceData> {
@@ -226,12 +284,17 @@ impl ConfigurableSource for HtmlSourceAdapter {
         // For synchronous compatibility, we'll use the blocking version
         // This should only be used in non-async contexts
         let fetcher = HtmlFetcher::new(config.clone())?;
-        Ok(Self { fetcher, config })
+        Ok(Self {
+            fetcher,
+            config,
+            storage: None,
+        })
     }
 
     fn update_config(&mut self, config: Self::Config) -> Result<()> {
         self.fetcher = HtmlFetcher::new(config.clone())?;
         self.config = config;
+        // Keep existing storage reference
         Ok(())
     }
 
@@ -251,6 +314,14 @@ impl DataSourceAdapterFactory {
 
     pub async fn create_html_source(config: HtmlConfig) -> Result<Box<dyn DataSource>> {
         let adapter = HtmlSourceAdapter::new(config).await?;
+        Ok(Box::new(adapter))
+    }
+
+    pub async fn create_html_source_with_storage(
+        config: HtmlConfig,
+        storage: std::sync::Arc<crate::storage::MinioStorage>
+    ) -> Result<Box<dyn DataSource>> {
+        let adapter = HtmlSourceAdapter::new_with_storage(config, storage).await?;
         Ok(Box::new(adapter))
     }
 

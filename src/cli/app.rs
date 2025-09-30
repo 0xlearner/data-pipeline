@@ -69,7 +69,7 @@ impl App {
         println!(
             "    -s, --from-storage          Process data from S3/MinIO storage instead of fetching from APIs"
         );
-        println!("    --source <SOURCE>           Process only the specified source");
+        println!("    --source <SOURCE>           Process only the specified source (HTML sources use two-stage processing)");
         println!("    --batch-size <SIZE>         Set batch size for processing large datasets");
         println!(
             "    --log-level <LEVEL>         Set logging level (trace, debug, info, warn, error)"
@@ -87,6 +87,8 @@ impl App {
         println!("    data-pipeline                           # Process all sources from APIs");
         println!("    data-pipeline --from-storage            # Process all sources from storage");
         println!("    data-pipeline --source kravemart       # Process only Krave Mart");
+        println!("    data-pipeline --source naheed          # Fetch Naheed HTML, store, then scrape");
+        println!("    data-pipeline --from-storage --source naheed     # Process stored Naheed HTML pages");
         println!("    data-pipeline --batch-size 1000         # Use batch size of 1000");
         println!("    data-pipeline --log-level debug         # Enable debug logging");
     }

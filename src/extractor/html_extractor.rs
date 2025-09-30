@@ -59,6 +59,56 @@ pub struct ScrapedProduct {
     pub category: String,
     pub url: Option<String>,
     pub raw_html: String,
+
+    // HTML storage metadata
+    pub category_path: Option<String>,  // e.g., "groceries-pets/fresh-products"
+    pub page_name: Option<String>,      // e.g., "fruits"
+    pub page_number: Option<u32>,       // e.g., 2 for pagination
+}
+
+impl ScrapedProduct {
+    /// Create a new ScrapedProduct with HTML storage metadata
+    pub fn with_storage_metadata(
+        mut self,
+        category_path: &str,
+        page_name: &str,
+        page_number: Option<u32>,
+    ) -> Self {
+        self.category_path = Some(category_path.to_string());
+        self.page_name = Some(page_name.to_string());
+        self.page_number = page_number;
+        self
+    }
+
+    /// Create a basic ScrapedProduct without storage metadata
+    pub fn new(
+        name: String,
+        price: String,
+        product_id: String,
+        category: String,
+        url: Option<String>,
+        raw_html: String,
+    ) -> Self {
+        Self {
+            name,
+            price,
+            product_id,
+            category,
+            url,
+            raw_html,
+            category_path: None,
+            page_name: None,
+            page_number: None,
+        }
+    }
+}
+
+/// Storage metadata extracted from URL
+#[derive(Debug, Clone)]
+pub struct StorageMetadata {
+    pub category_path: Option<String>,
+    pub page_name: Option<String>,
+    pub page_number: Option<u32>,
 }
 
 impl HtmlExtractor {
@@ -83,8 +133,11 @@ impl HtmlExtractor {
         category_name: &str,
         source_url: Option<String>,
     ) -> Result<Vec<ScrapedProduct>> {
+        // Extract storage metadata from URL
+        let storage_metadata = self.extract_storage_metadata_from_url(&source_url);
+
         // Primary: Use rule-based extraction
-        match self.extract_with_rules(html, category_name, source_url.clone()) {
+        match self.extract_with_rules(html, category_name, source_url.clone(), &storage_metadata) {
             Ok(products) if !products.is_empty() => {
                 info!("Rule-based extraction found {} products", products.len());
                 return Ok(products);
@@ -95,7 +148,7 @@ impl HtmlExtractor {
 
         // Secondary: Use ML-based extraction if available
         if let Some(ref ml_model) = self.ml_model {
-            match self.extract_with_ml(html, category_name, source_url, ml_model) {
+            match self.extract_with_ml(html, category_name, source_url, ml_model, &storage_metadata) {
                 Ok(products) if !products.is_empty() => {
                     info!("ML-based extraction found {} products", products.len());
                     return Ok(products);
@@ -110,12 +163,75 @@ impl HtmlExtractor {
         Ok(vec![])
     }
 
+    /// Extract storage metadata from Naheed URL
+    /// Examples:
+    /// - https://www.naheed.pk/groceries-pets/fresh-products/fruits → groceries-pets/fresh-products, fruits, None
+    /// - https://www.naheed.pk/groceries-pets/fresh-products/fruits?p=2 → groceries-pets/fresh-products, fruits, Some(2)
+    fn extract_storage_metadata_from_url(&self, source_url: &Option<String>) -> StorageMetadata {
+        let url = match source_url {
+            Some(url) => url,
+            None => return StorageMetadata {
+                category_path: None,
+                page_name: None,
+                page_number: None,
+            },
+        };
+
+        // Parse URL to extract path and query parameters
+        let url_parts: Vec<&str> = url.split('?').collect();
+        let path_part = url_parts[0];
+        let query_part = url_parts.get(1);
+
+        // Extract page number from query parameters
+        let page_number = if let Some(query) = query_part {
+            if let Some(p_param) = query.split('&').find(|param| param.starts_with("p=")) {
+                p_param.strip_prefix("p=").and_then(|p| p.parse::<u32>().ok())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Extract category path and page name from URL path
+        // Expected format: https://www.naheed.pk/groceries-pets/fresh-products/fruits
+        if let Some(naheed_path) = path_part.strip_prefix("https://www.naheed.pk/") {
+            let path_segments: Vec<&str> = naheed_path.split('/').collect();
+
+            if path_segments.len() >= 3 {
+                // For groceries-pets/fresh-products/fruits:
+                // path_segments = ["groceries-pets", "fresh-products", "fruits"]
+                let category_path = path_segments[..path_segments.len()-1].join("/");
+                let page_name = path_segments.last().unwrap().to_string();
+
+                StorageMetadata {
+                    category_path: Some(category_path),
+                    page_name: Some(page_name),
+                    page_number,
+                }
+            } else {
+                StorageMetadata {
+                    category_path: None,
+                    page_name: None,
+                    page_number,
+                }
+            }
+        } else {
+            StorageMetadata {
+                category_path: None,
+                page_name: None,
+                page_number,
+            }
+        }
+    }
+
     /// Rule-based product extraction using configured selectors
     fn extract_with_rules(
         &self,
         html: &str,
         category_name: &str,
         source_url: Option<String>,
+        storage_metadata: &StorageMetadata,
     ) -> Result<Vec<ScrapedProduct>> {
         let document = Html::parse_document(html);
         let mut products = Vec::new();
@@ -137,7 +253,7 @@ impl HtmlExtractor {
                     }
 
                     if let Some(product) =
-                        self.extract_single_product(&element, category_name, &source_url)
+                        self.extract_single_product(&element, category_name, &source_url, storage_metadata)
                     {
                         products.push(product);
                         found_products = true;
@@ -159,6 +275,7 @@ impl HtmlExtractor {
         element: &ElementRef,
         category_name: &str,
         source_url: &Option<String>,
+        storage_metadata: &StorageMetadata,
     ) -> Option<ScrapedProduct> {
         // Try all name selectors until we find text
         let mut name = None;
@@ -190,6 +307,9 @@ impl HtmlExtractor {
             category: category_name.to_string(),
             url: source_url.clone(),
             raw_html: element.html(),
+            category_path: storage_metadata.category_path.clone(),
+            page_name: storage_metadata.page_name.clone(),
+            page_number: storage_metadata.page_number,
         })
     }
 
@@ -210,6 +330,7 @@ impl HtmlExtractor {
         category_name: &str,
         source_url: Option<String>,
         ml_model: &ProductMLModel,
+        storage_metadata: &StorageMetadata,
     ) -> Result<Vec<ScrapedProduct>> {
         let document = Html::parse_document(html);
         let mut candidates = Vec::new();
@@ -263,7 +384,7 @@ impl HtmlExtractor {
         for candidate in candidates {
             if self.classify_product_candidate(&candidate, ml_model) {
                 if let Some(product) =
-                    self.extract_product_from_candidate(&candidate, category_name, &source_url)
+                    self.extract_product_from_candidate(&candidate, category_name, &source_url, storage_metadata)
                 {
                     products.push(product);
                 }
@@ -333,6 +454,7 @@ impl HtmlExtractor {
         candidate: &ProductCandidate,
         category_name: &str,
         source_url: &Option<String>,
+        storage_metadata: &StorageMetadata,
     ) -> Option<ScrapedProduct> {
         // Parse the candidate HTML to extract product details
         let fragment = Html::parse_fragment(&candidate.element_html);
@@ -350,6 +472,9 @@ impl HtmlExtractor {
             category: category_name.to_string(),
             url: source_url.clone(),
             raw_html: candidate.element_html.clone(),
+            category_path: storage_metadata.category_path.clone(),
+            page_name: storage_metadata.page_name.clone(),
+            page_number: storage_metadata.page_number,
         })
     }
 

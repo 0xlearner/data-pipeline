@@ -118,12 +118,28 @@ impl MinioStorage {
     }
 
     pub async fn store_raw_json(&self, api_name: &str, data: &str) -> Result<String> {
+        // For backward compatibility, use the API name as category
+        self.store_raw_json_with_category(api_name, api_name, data).await
+    }
+
+    /// Store raw JSON data with category organization
+    ///
+    /// # Arguments
+    /// * `api_name` - The API source name (e.g., "pandamart")
+    /// * `category_name` - The category name (e.g., "chocolate_desserts")
+    /// * `data` - The raw JSON data to store
+    ///
+    /// # Returns
+    /// Storage key in format: `YYYY/MM/DD/raw/api_name/category_name/YYYYMMDD-HHMMSS.json`
+    pub async fn store_raw_json_with_category(&self, api_name: &str, category_name: &str, data: &str) -> Result<String> {
         let date = Utc::now().format("%Y/%m/%d").to_string();
-        let timestamp = Utc::now().format("%H%M%S").to_string();
+        let timestamp = Utc::now().format("%Y%m%d-%H%M%S").to_string();
+
+        // Create file path: raw/api_name/category_name/timestamp.json
         let file_name = format!(
-            "raw/{}/{}-{}.json",
+            "raw/{}/{}/{}.json",
             api_name,
-            date.replace("/", ""),
+            category_name,
             timestamp
         );
         let key = format!("{}/{}", date, file_name);
@@ -131,11 +147,62 @@ impl MinioStorage {
         let response = self.bucket.put_object(&key, data.as_bytes()).await?;
 
         if response.status_code() == 200 {
-            info!("Stored raw JSON: {}", key);
+            info!("Stored raw JSON for {} ({}): {}", api_name, category_name, key);
             Ok(key)
         } else {
             Err(anyhow!(
                 "Failed to store object: HTTP {}",
+                response.status_code()
+            ))
+        }
+    }
+
+    /// Store raw HTML files with category structure and pagination support
+    ///
+    /// # Arguments
+    /// * `source_name` - The source name (e.g., "naheed")
+    /// * `category_path` - Category path (e.g., "groceries-pets/fresh-products")
+    /// * `page_name` - Page name (e.g., "fruits")
+    /// * `page_number` - Optional page number for pagination
+    /// * `html_content` - The raw HTML content
+    ///
+    /// # Returns
+    /// Storage key in format: `YYYY/MM/DD/raw/naheed/groceries-pets/fresh-products/fruits.html?p=2`
+    pub async fn store_raw_html(
+        &self,
+        source_name: &str,
+        category_path: &str,
+        page_name: &str,
+        page_number: Option<u32>,
+        html_content: &str,
+    ) -> Result<String> {
+        let date = Utc::now().format("%Y/%m/%d").to_string();
+
+        // Build the file name with optional pagination
+        let file_name = if let Some(page_num) = page_number {
+            format!("{}.html?p={}", page_name, page_num)
+        } else {
+            format!("{}.html", page_name)
+        };
+
+        // Build the full path: raw/source/category_path/file_name
+        let full_path = format!(
+            "raw/{}/{}/{}",
+            source_name,
+            category_path,
+            file_name
+        );
+
+        let key = format!("{}/{}", date, full_path);
+
+        let response = self.bucket.put_object(&key, html_content.as_bytes()).await?;
+
+        if response.status_code() == 200 {
+            info!("Stored raw HTML: {}", key);
+            Ok(key)
+        } else {
+            Err(anyhow!(
+                "Failed to store HTML: HTTP {}",
                 response.status_code()
             ))
         }
@@ -178,6 +245,11 @@ impl MinioStorage {
         Ok(object_names)
     }
 
+    /// List objects with a given prefix (convenience method)
+    pub async fn list_objects_with_prefix(&self, prefix: &str) -> Result<Vec<String>> {
+        self.list_objects(Some(prefix)).await
+    }
+
     pub async fn get_object(&self, object_name: &str) -> Result<Vec<u8>> {
         let response = self.bucket.get_object(object_name).await?;
 
@@ -189,6 +261,11 @@ impl MinioStorage {
                 response.status_code()
             ))
         }
+    }
+
+    /// Get raw content from storage (alias for get_object)
+    pub async fn get_raw_content(&self, key: &str) -> Result<Vec<u8>> {
+        self.get_object(key).await
     }
 
     /// Get raw JSON data as string from S3/MinIO

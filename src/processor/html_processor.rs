@@ -346,6 +346,9 @@ mod tests {
             category: "Fruits".to_string(),
             url: None,
             raw_html: "".to_string(),
+            category_path: None,
+            page_name: None,
+            page_number: None,
         };
 
         assert!(processor.validate_product(&valid_product));
@@ -357,6 +360,9 @@ mod tests {
             category: "Fruits".to_string(),
             url: None,
             raw_html: "".to_string(),
+            category_path: None,
+            page_name: None,
+            page_number: None,
         };
 
         assert!(!processor.validate_product(&invalid_product));
@@ -373,6 +379,9 @@ mod tests {
             category: "Fruits".to_string(),
             url: Some("https://example.com/bananas".to_string()),
             raw_html: "".to_string(),
+            category_path: None,
+            page_name: None,
+            page_number: None,
         };
 
         let json = processor.convert_to_json(&product).unwrap();

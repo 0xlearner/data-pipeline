@@ -5,6 +5,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use tracing::{error, info, warn};
 
+use crate::traits::{ExecutionStatus, PipelineResult as TraitPipelineResult, pipeline::PipelineMetrics, RawSourceData};
+
 use crate::adapters::{
     ApiSourceAdapter, HtmlSourceAdapter, MinioStorageAdapter, MinioStorageConfig,
     UnifiedPipelineAdapter,
@@ -24,6 +26,7 @@ pub struct PipelineOrchestrator {
     pipeline: UnifiedPipelineAdapter,
     sources: HashMap<String, SourceDefinition>,
     storage: Arc<dyn crate::traits::Storage>,
+    minio_storage: Arc<MinioStorage>,
 }
 
 /// Source definition for the pipeline
@@ -107,7 +110,7 @@ impl PipelineOrchestrator {
 
         // Create unified pipeline using trait-based architecture
         let mut pipeline =
-            UnifiedPipelineAdapter::new("main_orchestrator_pipeline".to_string(), minio_storage);
+            UnifiedPipelineAdapter::new("main_orchestrator_pipeline".to_string(), minio_storage.clone());
 
         // Define available sources with their configurations
         let mut sources = HashMap::new();
@@ -164,6 +167,7 @@ impl PipelineOrchestrator {
             pipeline,
             sources,
             storage,
+            minio_storage,
         })
     }
 
@@ -175,6 +179,7 @@ impl PipelineOrchestrator {
                     ApiConfig::from_file(&source_def.config_path).with_context(|| {
                         format!("Failed to load API config from {}", source_def.config_path)
                     })?;
+                // Create without storage for now - will be enhanced at runtime for two-stage processing
                 let adapter = ApiSourceAdapter::new(api_config).await?;
                 Ok(Box::new(adapter))
             }
@@ -183,10 +188,159 @@ impl PipelineOrchestrator {
                     HtmlConfig::from_file(&source_def.config_path).with_context(|| {
                         format!("Failed to load HTML config from {}", source_def.config_path)
                     })?;
+                // Create without storage for now - will be enhanced at runtime
                 let adapter = HtmlSourceAdapter::new(html_config).await?;
                 Ok(Box::new(adapter))
             }
         }
+    }
+
+    /// Create a storage-enabled HTML source for two-stage processing
+    async fn create_html_source_with_storage(&self, source_def: &SourceDefinition) -> Result<Box<dyn DataSource>> {
+        let html_config = HtmlConfig::from_file(&source_def.config_path).with_context(|| {
+            format!("Failed to load HTML config from {}", source_def.config_path)
+        })?;
+
+        let adapter = HtmlSourceAdapter::new_with_storage(html_config, self.minio_storage.clone()).await?;
+        Ok(Box::new(adapter))
+    }
+
+    /// Create a storage-enabled API source for two-stage processing
+    async fn create_api_source_with_storage(&self, source_def: &SourceDefinition) -> Result<Box<dyn DataSource>> {
+        let api_config = ApiConfig::from_file(&source_def.config_path).with_context(|| {
+            format!("Failed to load API config from {}", source_def.config_path)
+        })?;
+
+        let adapter = ApiSourceAdapter::new_with_storage(api_config, self.minio_storage.clone()).await?;
+        Ok(Box::new(adapter))
+    }
+
+    /// Process HTML source using two-stage approach (fetch → store → scrape)
+    async fn process_html_source_two_stage(
+        &self,
+        source_def: &SourceDefinition,
+        context: &PipelineContext,
+    ) -> Result<TraitPipelineResult> {
+        info!("🔄 Starting two-stage HTML processing for: {}", source_def.name);
+
+        // Create storage-enabled HTML source
+        let html_source = self.create_html_source_with_storage(source_def).await?;
+
+        // Fetch data using the storage-enabled source (this will do fetch → store → scrape)
+        let raw_source_data = html_source.fetch_all().await?;
+
+        // Convert RawSourceData to RawData
+        let raw_data = match raw_source_data {
+            RawSourceData::Html(products) => {
+                crate::pipeline::unified_pipeline::RawData::Html(products)
+            }
+            _ => return Err(anyhow::anyhow!("Expected HTML data from HTML source")),
+        };
+
+        // Process the data through the pipeline stages
+        let temp_pipeline = crate::pipeline::unified_pipeline::UnifiedPipeline::new(
+            self.minio_storage.clone()
+        );
+
+        let unified_context = crate::pipeline::unified_pipeline::PipelineContext {
+            source_name: source_def.name.clone(),
+            source_type: crate::pipeline::unified_pipeline::SourceType::Html,
+            batch_size: Some(1000), // Default batch size
+            skip_storage: false,
+            validate_data: true,
+        };
+
+        let result = temp_pipeline.execute(unified_context, raw_data).await?;
+
+        // Convert unified pipeline result to trait pipeline result
+        let now = chrono::Utc::now();
+        Ok(TraitPipelineResult {
+            execution_id: context.execution_id.clone(),
+            pipeline_name: "two-stage-html".to_string(),
+            status: ExecutionStatus::Completed,
+            start_time: now,
+            end_time: Some(now),
+            duration: Some(std::time::Duration::from_secs(0)),
+            sources_processed: vec![],
+            total_records_processed: result.processed_items as u64,
+            total_records_output: result.processed_items as u64,
+            errors: vec![],
+            warnings: vec![],
+            metrics: PipelineMetrics {
+                memory_usage_mb: 0.0,
+                cpu_usage_percent: 0.0,
+                disk_io_mb: 0.0,
+                network_io_mb: 0.0,
+                cache_hit_rate: 0.0,
+                error_rate: 0.0,
+                throughput_records_per_second: 0.0,
+            },
+            output_locations: vec![],
+        })
+    }
+
+    /// Process API source using two-stage approach (fetch → store → extract)
+    async fn process_api_source_two_stage(
+        &self,
+        source_def: &SourceDefinition,
+        context: &PipelineContext,
+    ) -> Result<TraitPipelineResult> {
+        info!("🔄 Starting two-stage API processing for: {}", source_def.name);
+
+        // Create storage-enabled API source
+        let api_source = self.create_api_source_with_storage(source_def).await?;
+
+        // Fetch data using the storage-enabled source (this will do fetch → store → extract)
+        let raw_source_data = api_source.fetch_all().await?;
+
+        // Convert RawSourceData to RawData
+        let raw_data = match raw_source_data {
+            RawSourceData::Json(products) => {
+                crate::pipeline::unified_pipeline::RawData::Json(products)
+            }
+            _ => return Err(anyhow::anyhow!("Expected JSON data from API source")),
+        };
+
+        // Process the data through the pipeline stages
+        let temp_pipeline = crate::pipeline::unified_pipeline::UnifiedPipeline::new(
+            self.minio_storage.clone()
+        );
+
+        let unified_context = crate::pipeline::unified_pipeline::PipelineContext {
+            source_name: source_def.name.clone(),
+            source_type: crate::pipeline::unified_pipeline::SourceType::Api,
+            batch_size: Some(1000), // Default batch size
+            skip_storage: false,
+            validate_data: true,
+        };
+
+        let result = temp_pipeline.execute(unified_context, raw_data).await?;
+
+        // Convert unified pipeline result to trait pipeline result
+        let now = chrono::Utc::now();
+        Ok(TraitPipelineResult {
+            execution_id: context.execution_id.clone(),
+            pipeline_name: "two-stage-api".to_string(),
+            status: ExecutionStatus::Completed,
+            start_time: now,
+            end_time: Some(now),
+            duration: Some(std::time::Duration::from_secs(0)),
+            sources_processed: vec![],
+            total_records_processed: result.processed_items as u64,
+            total_records_output: result.processed_items as u64,
+            errors: vec![],
+            warnings: vec![],
+            metrics: PipelineMetrics {
+                memory_usage_mb: 0.0,
+                cpu_usage_percent: 0.0,
+                disk_io_mb: 0.0,
+                network_io_mb: 0.0,
+                cache_hit_rate: 0.0,
+                error_rate: 0.0,
+                throughput_records_per_second: 0.0,
+            },
+            output_locations: vec![],
+        })
     }
 
     /// Run the complete pipeline with the given options using trait-based architecture
@@ -214,11 +368,12 @@ impl PipelineOrchestrator {
         }
 
         info!(
-            "Processing {} sources using trait-based pipeline",
+            "Processing {} sources using trait-based pipeline with concurrency support",
             sources_to_process.len()
         );
 
         // Process each source using the unified pipeline
+        // Note: Concurrency is implemented at the HTTP request level within each source
         let mut source_results = Vec::new();
         let mut total_products = 0;
         let mut successful_sources = 0;
@@ -253,6 +408,12 @@ impl PipelineOrchestrator {
             let result = if options.from_storage {
                 self.process_source_from_storage_trait(&source_def.name, &context)
                     .await
+            } else if source_def.source_type == SourceType::Html {
+                // For HTML sources, use two-stage processing (fetch → store → scrape)
+                self.process_html_source_two_stage(&source_def, &context).await
+            } else if source_def.source_type == SourceType::Json {
+                // For API sources, use two-stage processing (fetch → store → extract)
+                self.process_api_source_two_stage(&source_def, &context).await
             } else {
                 self.pipeline.execute(context).await
             };
@@ -340,6 +501,8 @@ impl PipelineOrchestrator {
             source_results,
         })
     }
+
+
 
     /// Create pipeline context for a source
     fn create_pipeline_context(

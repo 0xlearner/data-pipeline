@@ -1,23 +1,41 @@
 use anyhow::Result;
 use scraper::{Html, Selector};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use crate::config::HtmlConfig;
 use crate::extractor::{HtmlExtractor, ScrapedProduct};
-use crate::fetcher::HttpFetcher;
+use crate::fetcher::{HttpFetcher, HtmlPageProcessor};
+use crate::storage::MinioStorage;
 
-/// Refactored HtmlFetcher that coordinates HTTP fetching and HTML extraction
-/// Delegates HTTP operations to HttpFetcher and data processing to HtmlExtractor
+/// Unified HtmlFetcher that can operate in two modes:
+/// 1. Direct mode: Fetch and scrape immediately
+/// 2. Storage mode: Fetch HTML, store in S3, then scrape from storage
 pub struct HtmlFetcher {
     http_fetcher: HttpFetcher,
     extractor: HtmlExtractor,
     config: HtmlConfig,
+    storage: Option<Arc<MinioStorage>>,
+    storage_mode: bool,
+}
+
+/// Represents a fetched HTML page with metadata (used in storage mode)
+#[derive(Debug, Clone)]
+pub struct FetchedPage {
+    pub url: String,
+    pub category_name: String,
+    pub page_number: Option<u32>,
+    pub html_content: String,
+    pub storage_key: String,
+    pub category_path: String,
+    pub page_name: String,
 }
 
 impl HtmlFetcher {
     /// Create HtmlFetcher with default HTTP configuration (for backward compatibility)
+    /// This creates a direct-mode fetcher (no storage)
     pub fn new(config: HtmlConfig) -> Result<Self> {
         // Create a runtime handle to initialize async components
         let rt = tokio::runtime::Handle::try_current().map_err(|_| {
@@ -27,7 +45,7 @@ impl HtmlFetcher {
         rt.block_on(Self::new_async(config))
     }
 
-    /// Create HtmlFetcher with global configuration (preferred method)
+    /// Create HtmlFetcher in direct mode (fetch and scrape immediately)
     pub async fn new_async(config: HtmlConfig) -> Result<Self> {
         // Determine source name from config
         let source_name = if config.site.name.is_empty() {
@@ -42,6 +60,28 @@ impl HtmlFetcher {
             http_fetcher,
             extractor,
             config,
+            storage: None,
+            storage_mode: false,
+        })
+    }
+
+    /// Create HtmlFetcher in storage mode (fetch HTML, store, then scrape from storage)
+    pub async fn new_with_storage(config: HtmlConfig, storage: Arc<MinioStorage>) -> Result<Self> {
+        // Determine source name from config
+        let source_name = if config.site.name.is_empty() {
+            "unknown_site"
+        } else {
+            &config.site.name
+        };
+        let http_fetcher = HttpFetcher::new_for_source(source_name).await?;
+        let extractor = HtmlExtractor::new(config.clone());
+
+        Ok(HtmlFetcher {
+            http_fetcher,
+            extractor,
+            config,
+            storage: Some(storage),
+            storage_mode: true,
         })
     }
 
@@ -52,17 +92,32 @@ impl HtmlFetcher {
             http_fetcher,
             extractor,
             config,
+            storage: None,
+            storage_mode: false,
         }
     }
 
     /// Fetch products from all configured categories
+    /// In storage mode: fetches HTML, stores it, then scrapes from storage
+    /// In direct mode: fetches HTML and scrapes immediately
     pub async fn fetch_all_categories(&self) -> Result<Vec<ScrapedProduct>> {
+        if self.storage_mode {
+            // Storage mode: fetch HTML, store, then scrape from storage
+            self.fetch_store_and_scrape_all_categories().await
+        } else {
+            // Direct mode: fetch and scrape immediately
+            self.fetch_and_scrape_all_categories_direct().await
+        }
+    }
+
+    /// Direct mode: Fetch and scrape immediately (original behavior)
+    async fn fetch_and_scrape_all_categories_direct(&self) -> Result<Vec<ScrapedProduct>> {
         let mut all_products = Vec::new();
 
         for (category_name, category_config) in &self.config.categories {
             info!("Scraping category: {}", category_name);
 
-            match self.scrape_category(category_name, category_config).await {
+            match self.scrape_category_direct(category_name, category_config).await {
                 Ok(products) => {
                     info!("Scraped {} products from {}", products.len(), category_name);
                     all_products.extend(products);
@@ -83,8 +138,137 @@ impl HtmlFetcher {
         Ok(all_products)
     }
 
-    /// Scrape a specific category
-    async fn scrape_category(
+    /// Storage mode: Fetch HTML, store in S3, then scrape from storage
+    async fn fetch_store_and_scrape_all_categories(&self) -> Result<Vec<ScrapedProduct>> {
+        let storage = self.storage.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
+
+        // Step 1: Fetch and store HTML pages
+        info!("🔄 Step 1: Fetching and storing HTML pages");
+        let _fetched_pages = self.fetch_and_store_all_categories().await?;
+
+        // Step 2: Process stored HTML pages
+        info!("🔄 Step 2: Processing stored HTML pages");
+        let processor = HtmlPageProcessor::new(self.config.clone(), storage.clone())?;
+        let products = processor.process_all_stored_pages().await?;
+
+        Ok(products)
+    }
+
+    /// Fetch and store HTML pages for all configured categories (storage mode)
+    async fn fetch_and_store_all_categories(&self) -> Result<Vec<FetchedPage>> {
+        let mut all_pages = Vec::new();
+
+        for (category_name, category_config) in &self.config.categories {
+            info!("Fetching HTML pages for category: {}", category_name);
+
+            match self.fetch_and_store_category(category_name, category_config).await {
+                Ok(pages) => {
+                    info!("Fetched {} pages from {}", pages.len(), category_name);
+                    all_pages.extend(pages);
+                }
+                Err(e) => {
+                    error!("Failed to fetch category {}: {}", category_name, e);
+                    continue;
+                }
+            }
+
+            // Rate limiting between categories
+            let delay = Duration::from_millis(
+                self.config.scraping.delay_between_requests_ms + (rand::random::<u64>() % 1000),
+            );
+            sleep(delay).await;
+        }
+
+        Ok(all_pages)
+    }
+
+    /// Fetch and store HTML pages for a specific category (storage mode)
+    async fn fetch_and_store_category(
+        &self,
+        category_name: &str,
+        category_config: &crate::config::html_config::CategoryConfig,
+    ) -> Result<Vec<FetchedPage>> {
+        let storage = self.storage.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
+
+        let mut all_pages = Vec::new();
+
+        // Extract category path and page name from URL
+        let (category_path, page_name) = self.extract_path_info(&category_config.base_url);
+
+        // First, fetch the first page to determine total page count
+        let first_page_url = category_config.base_url.clone();
+        info!("Fetching page 1 of {}: {}", category_name, first_page_url);
+
+        let first_page_html = match self.fetch_page_with_retry(&first_page_url, 3).await {
+            Ok(html) => html,
+            Err(e) => {
+                error!("Failed to fetch first page of {}: {}", category_name, e);
+                return Ok(all_pages);
+            }
+        };
+
+        // Store first page
+        let storage_key = storage.store_raw_html(
+            "naheed",
+            &category_path,
+            &page_name,
+            None,
+            &first_page_html,
+        ).await?;
+
+        all_pages.push(FetchedPage {
+            url: first_page_url.clone(),
+            category_name: category_name.to_string(),
+            page_number: None,
+            html_content: first_page_html.clone(),
+            storage_key,
+            category_path: category_path.clone(),
+            page_name: page_name.clone(),
+        });
+
+        // Extract total page count from first page
+        let total_pages = self
+            .extract_total_page_count(&first_page_html)
+            .unwrap_or_else(|| {
+                info!(
+                    "Could not extract total page count for {}, using configured max_pages",
+                    category_name
+                );
+                self.config.scraping.max_pages_per_category
+            });
+
+        info!(
+            "Found {} total pages for category {}",
+            total_pages, category_name
+        );
+
+        // Fetch remaining pages (pages 2 to total_pages)
+        for page in 2..=total_pages {
+            let url = format!("{}?p={}", category_config.base_url, page);
+            info!("Fetching page {} of {}: {}", page, category_name, url);
+
+            match self.fetch_and_store_page(&url, category_name, &category_path, &page_name, Some(page as u32)).await {
+                Ok(fetched_page) => {
+                    all_pages.push(fetched_page);
+                }
+                Err(e) => {
+                    error!("Failed to fetch page {} of {}: {}", page, category_name, e);
+                    continue;
+                }
+            }
+
+            // Rate limiting between pages
+            let delay = Duration::from_millis(self.config.scraping.delay_between_requests_ms);
+            sleep(delay).await;
+        }
+
+        Ok(all_pages)
+    }
+
+    /// Scrape a specific category (direct mode)
+    async fn scrape_category_direct(
         &self,
         category_name: &str,
         category_config: &crate::config::html_config::CategoryConfig,
@@ -179,7 +363,59 @@ impl HtmlFetcher {
         Ok(all_products)
     }
 
-    /// Scrape a single page
+    /// Fetch and store a single page (storage mode)
+    async fn fetch_and_store_page(
+        &self,
+        url: &str,
+        category_name: &str,
+        category_path: &str,
+        page_name: &str,
+        page_number: Option<u32>,
+    ) -> Result<FetchedPage> {
+        let storage = self.storage.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
+
+        let html = self.fetch_page_with_retry(url, 3).await?;
+
+        let storage_key = storage.store_raw_html(
+            "naheed",
+            category_path,
+            page_name,
+            page_number,
+            &html,
+        ).await?;
+
+        Ok(FetchedPage {
+            url: url.to_string(),
+            category_name: category_name.to_string(),
+            page_number,
+            html_content: html,
+            storage_key,
+            category_path: category_path.to_string(),
+            page_name: page_name.to_string(),
+        })
+    }
+
+    /// Extract category path and page name from Naheed URL
+    /// Example: https://www.naheed.pk/groceries-pets/fresh-products/fruits
+    /// Returns: ("groceries-pets/fresh-products", "fruits")
+    fn extract_path_info(&self, url: &str) -> (String, String) {
+        if let Some(naheed_path) = url.strip_prefix("https://www.naheed.pk/") {
+            let path_segments: Vec<&str> = naheed_path.split('/').collect();
+
+            if path_segments.len() >= 3 {
+                let category_path = path_segments[..path_segments.len()-1].join("/");
+                let page_name = path_segments.last().unwrap().to_string();
+                (category_path, page_name)
+            } else {
+                ("unknown".to_string(), "unknown".to_string())
+            }
+        } else {
+            ("unknown".to_string(), "unknown".to_string())
+        }
+    }
+
+    /// Scrape a single page (direct mode)
     async fn scrape_page(&self, url: &str, category_name: &str) -> Result<Vec<ScrapedProduct>> {
         let html = self.fetch_page_with_retry(url, 3).await?;
         // Delegate to extractor
@@ -291,6 +527,8 @@ mod tests {
             http_fetcher: HttpFetcher::default(),
             extractor: HtmlExtractor::new(config.clone()),
             config,
+            storage: None,
+            storage_mode: false,
         };
 
         let html = r#"
@@ -316,6 +554,8 @@ mod tests {
             http_fetcher: HttpFetcher::default(),
             extractor: HtmlExtractor::new(config.clone()),
             config,
+            storage: None,
+            storage_mode: false,
         };
 
         let html = r#"
@@ -344,6 +584,8 @@ mod tests {
             http_fetcher: HttpFetcher::default(),
             extractor: HtmlExtractor::new(config.clone()),
             config,
+            storage: None,
+            storage_mode: false,
         };
 
         let html = r#"

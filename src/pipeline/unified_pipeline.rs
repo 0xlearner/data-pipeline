@@ -154,7 +154,7 @@ impl UnifiedPipeline {
     async fn transform_to_json(
         &self,
         raw_data: RawData,
-        _context: &PipelineContext,
+        context: &PipelineContext,
     ) -> Result<Vec<Value>> {
         match raw_data {
             RawData::Json(json_data) => {
@@ -166,6 +166,15 @@ impl UnifiedPipeline {
                     "🔄 Converting {} HTML products to JSON format",
                     scraped_products.len()
                 );
+
+                // Store HTML files if products have storage metadata
+                if !context.skip_storage {
+                    let html_keys = self.store_raw_html_data(&context.source_name, &scraped_products).await?;
+                    if !html_keys.is_empty() {
+                        info!("💾 Stored {} HTML files: {:?}", html_keys.len(), html_keys);
+                    }
+                }
+
                 self.html_processor
                     .process_scraped_products(scraped_products)
             }
@@ -185,6 +194,42 @@ impl UnifiedPipeline {
 
         info!("💾 Stage 2: Stored raw data at: {}", storage_key);
         Ok(storage_key)
+    }
+
+    /// Store raw HTML data with category structure and pagination support
+    async fn store_raw_html_data(&self, source_name: &str, products: &[ScrapedProduct]) -> Result<Vec<String>> {
+        let mut html_storage_keys = Vec::new();
+
+        // Group products by category_path and page_name for HTML storage
+        let mut html_groups: std::collections::HashMap<(String, String, Option<u32>), Vec<&ScrapedProduct>> = std::collections::HashMap::new();
+
+        for product in products {
+            if let (Some(category_path), Some(page_name)) = (&product.category_path, &product.page_name) {
+                let key = (category_path.clone(), page_name.clone(), product.page_number);
+                html_groups.entry(key).or_insert_with(Vec::new).push(product);
+            }
+        }
+
+        // Store HTML files for each group
+        for ((category_path, page_name, page_number), group_products) in html_groups {
+            // Combine all HTML content for this page
+            let combined_html = group_products.iter()
+                .map(|p| p.raw_html.as_str())
+                .collect::<Vec<_>>()
+                .join("\n<!-- PRODUCT_SEPARATOR -->\n");
+
+            let html_key = self.storage.store_raw_html(
+                source_name,
+                &category_path,
+                &page_name,
+                page_number,
+                &combined_html,
+            ).await.context("Failed to store HTML data")?;
+
+            html_storage_keys.push(html_key);
+        }
+
+        Ok(html_storage_keys)
     }
 
     /// Process data through the standardized pipeline stages
