@@ -13,7 +13,7 @@ page_size = 20
 [request.headers]
 
 [response]
-# BazaarApp returns products directly as an array
+data_path = "[]"
 
 [pagination]
 type = "post_body"

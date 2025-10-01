@@ -2,7 +2,6 @@ use anyhow::Result;
 use serde_json::Value;
 use std::collections::HashMap;
 
-
 use super::base::FieldExtractor;
 
 /// Standard field extractor that handles common e-commerce product fields
@@ -13,7 +12,7 @@ impl StandardFieldExtractor {
     pub fn new() -> Self {
         Self
     }
-    
+
     /// Helper function to safely extract string values
     fn get_string(&self, item: &Value, key: &str) -> String {
         item.get(key)
@@ -50,10 +49,10 @@ impl StandardFieldExtractor {
             _ => None,
         })
     }
-    
+
     /// Extract product identifier using multiple field name conventions
     fn extract_identifier(&self, item: &Value) -> Option<String> {
-        if let Some(product_id) = item.get("product_id").and_then(|v| v.as_u64()) {
+        if let Some(product_id) = item.get("product_id").and_then(|v| v.as_str()) {
             Some(product_id.to_string())
         } else if let Some(product_id) = item.get("productID").and_then(|v| v.as_str()) {
             // Pandamart: productID field
@@ -77,7 +76,7 @@ impl StandardFieldExtractor {
             }
         }
     }
-    
+
     /// Extract product name using multiple field name conventions
     fn extract_name(&self, item: &Value) -> String {
         let name = self.get_string(item, "name");
@@ -92,7 +91,7 @@ impl StandardFieldExtractor {
             }
         }
     }
-    
+
     /// Extract SKU using multiple field name conventions
     fn extract_sku(&self, item: &Value) -> String {
         let direct_sku = self.get_string(item, "sku");
@@ -208,7 +207,7 @@ impl FieldExtractor for StandardFieldExtractor {
 
         Ok(record)
     }
-    
+
     fn name(&self) -> &'static str {
         "Standard"
     }

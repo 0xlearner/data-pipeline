@@ -119,7 +119,8 @@ impl MinioStorage {
 
     pub async fn store_raw_json(&self, api_name: &str, data: &str) -> Result<String> {
         // For backward compatibility, use the API name as category
-        self.store_raw_json_with_category(api_name, api_name, data).await
+        self.store_raw_json_with_category(api_name, api_name, data)
+            .await
     }
 
     /// Store raw JSON data with category organization
@@ -131,23 +132,26 @@ impl MinioStorage {
     ///
     /// # Returns
     /// Storage key in format: `YYYY/MM/DD/raw/api_name/category_name/YYYYMMDD-HHMMSS.json`
-    pub async fn store_raw_json_with_category(&self, api_name: &str, category_name: &str, data: &str) -> Result<String> {
+    pub async fn store_raw_json_with_category(
+        &self,
+        api_name: &str,
+        category_name: &str,
+        data: &str,
+    ) -> Result<String> {
         let date = Utc::now().format("%Y/%m/%d").to_string();
         let timestamp = Utc::now().format("%Y%m%d-%H%M%S").to_string();
 
         // Create file path: raw/api_name/category_name/timestamp.json
-        let file_name = format!(
-            "raw/{}/{}/{}.json",
-            api_name,
-            category_name,
-            timestamp
-        );
+        let file_name = format!("raw/{}/{}/{}.json", api_name, category_name, timestamp);
         let key = format!("{}/{}", date, file_name);
 
         let response = self.bucket.put_object(&key, data.as_bytes()).await?;
 
         if response.status_code() == 200 {
-            info!("Stored raw JSON for {} ({}): {}", api_name, category_name, key);
+            info!(
+                "Stored raw JSON for {} ({}): {}",
+                api_name, category_name, key
+            );
             Ok(key)
         } else {
             Err(anyhow!(
@@ -186,16 +190,14 @@ impl MinioStorage {
         };
 
         // Build the full path: raw/source/category_path/file_name
-        let full_path = format!(
-            "raw/{}/{}/{}",
-            source_name,
-            category_path,
-            file_name
-        );
+        let full_path = format!("raw/{}/{}/{}", source_name, category_path, file_name);
 
         let key = format!("{}/{}", date, full_path);
 
-        let response = self.bucket.put_object(&key, html_content.as_bytes()).await?;
+        let response = self
+            .bucket
+            .put_object(&key, html_content.as_bytes())
+            .await?;
 
         if response.status_code() == 200 {
             info!("Stored raw HTML: {}", key);
@@ -328,19 +330,30 @@ impl MinioStorage {
         }
 
         let file_count = raw_files.len();
-        info!("Loading raw data from {} files for: {}", file_count, api_name);
+        info!(
+            "Loading raw data from {} files for: {}",
+            file_count, api_name
+        );
         let mut all_data = Vec::new();
 
         for file_key in raw_files {
             info!("Loading raw data from: {}", file_key);
             let json_str = self.get_raw_json(&file_key).await?;
-            let data: Vec<serde_json::Value> = serde_json::from_str(&json_str)
-                .map_err(|e| anyhow!("Failed to parse JSON data from {}: {}", file_key, e))?;
+            let data: Vec<serde_json::Value> = serde_json::from_str(&json_str).or_else(|e| {
+                // If parsing as a Vec fails, try parsing as a single Value
+                serde_json::from_str(&json_str)
+                    .map(|single_value| vec![single_value])
+                    .map_err(|_| anyhow!("Failed to parse JSON data from {}: {}", file_key, e))
+            })?;
 
             all_data.extend(data);
         }
 
-        info!("Loaded total {} raw API responses from {} files", all_data.len(), file_count);
+        info!(
+            "Loaded total {} raw API responses from {} files",
+            all_data.len(),
+            file_count
+        );
         Ok(all_data)
     }
 

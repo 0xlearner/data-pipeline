@@ -1,4 +1,3 @@
-
 use anyhow::{Result, anyhow};
 use serde_json::Value;
 use std::sync::Arc;
@@ -107,7 +106,9 @@ impl ApiFetcher {
         if self.storage_mode {
             // In storage mode, only fetch and store - don't extract
             // Extraction should be handled by the pipeline/extractor layer
-            return Err(anyhow!("Storage mode should not extract products in fetcher. Use fetch_and_store_only() instead."));
+            return Err(anyhow!(
+                "Storage mode should not extract products in fetcher. Use fetch_and_store_only() instead."
+            ));
         } else {
             self.fetch_all_categories_direct().await
         }
@@ -116,14 +117,19 @@ impl ApiFetcher {
     /// Fetch and store all categories (storage mode) - returns storage keys, not products
     pub async fn fetch_and_store_only(&self) -> Result<Vec<FetchedApiResponse>> {
         if !self.storage_mode {
-            return Err(anyhow!("fetch_and_store_only() can only be used in storage mode"));
+            return Err(anyhow!(
+                "fetch_and_store_only() can only be used in storage mode"
+            ));
         }
 
         info!("🔄 Starting fetch and store (no extraction)");
 
         // Only do Stage 1: Fetch and store all API responses
         let fetched_responses = self.fetch_and_store_all_categories().await?;
-        info!("📄 Fetch and store complete: Stored {} API responses", fetched_responses.len());
+        info!(
+            "📄 Fetch and store complete: Stored {} API responses",
+            fetched_responses.len()
+        );
 
         Ok(fetched_responses)
     }
@@ -210,11 +216,11 @@ impl ApiFetcher {
         Ok(all_data)
     }
 
-
-
     /// Stage 1: Fetch and store all API responses
     async fn fetch_and_store_all_categories(&self) -> Result<Vec<FetchedApiResponse>> {
-        let _storage = self.storage.as_ref()
+        let _storage = self
+            .storage
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
 
         let mut all_responses = Vec::new();
@@ -228,7 +234,8 @@ impl ApiFetcher {
                     let response = if self.config.pagination.r#type == "none" {
                         self.fetch_and_store_get_single(&category_key, &url).await?
                     } else {
-                        self.fetch_and_store_get_paginated(&category_key, &url).await?
+                        self.fetch_and_store_get_paginated(&category_key, &url)
+                            .await?
                     };
 
                     all_responses.push(response);
@@ -240,9 +247,15 @@ impl ApiFetcher {
                     for (category_key, category) in &self.config.categories {
                         if let Some(ref category_id) = category.category_id {
                             info!("📥 Fetching and storing GraphQL category: {}", category_key);
-                            match self.fetch_and_store_graphql_single(category_key, category_id).await {
+                            match self
+                                .fetch_and_store_graphql_single(category_key, category_id)
+                                .await
+                            {
                                 Ok(response) => all_responses.push(response),
-                                Err(e) => error!("Failed to fetch GraphQL category {}: {}", category_key, e),
+                                Err(e) => error!(
+                                    "Failed to fetch GraphQL category {}: {}",
+                                    category_key, e
+                                ),
                             }
                         }
                     }
@@ -251,9 +264,14 @@ impl ApiFetcher {
                     let category_slugs = self.config.get_category_slugs();
                     for (category_key, category_slug) in category_slugs {
                         info!("📥 Fetching and storing POST category: {}", category_key);
-                        match self.fetch_and_store_post_paginated(&category_key, &category_slug).await {
+                        match self
+                            .fetch_and_store_post_paginated(&category_key, &category_slug)
+                            .await
+                        {
                             Ok(response) => all_responses.push(response),
-                            Err(e) => error!("Failed to fetch POST category {}: {}", category_key, e),
+                            Err(e) => {
+                                error!("Failed to fetch POST category {}: {}", category_key, e)
+                            }
                         }
                     }
                 }
@@ -468,8 +486,14 @@ impl ApiFetcher {
     }
 
     /// Fetch and store a single GET request (storage mode)
-    async fn fetch_and_store_get_single(&self, category_key: &str, url: &str) -> Result<FetchedApiResponse> {
-        let storage = self.storage.as_ref()
+    async fn fetch_and_store_get_single(
+        &self,
+        category_key: &str,
+        url: &str,
+    ) -> Result<FetchedApiResponse> {
+        let storage = self
+            .storage
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
 
         info!("📥 Fetching single GET request from: {}", url);
@@ -477,7 +501,9 @@ impl ApiFetcher {
 
         // Store the raw JSON response
         let json_str = serde_json::to_string_pretty(&data)?;
-        let storage_key = storage.store_raw_json_with_category(&self.config.api.name, category_key, &json_str).await?;
+        let storage_key = storage
+            .store_raw_json_with_category(&self.config.api.name, category_key, &json_str)
+            .await?;
 
         Ok(FetchedApiResponse {
             category_key: category_key.to_string(),
@@ -490,8 +516,14 @@ impl ApiFetcher {
     }
 
     /// Fetch and store paginated GET requests (storage mode)
-    async fn fetch_and_store_get_paginated(&self, category_key: &str, url: &str) -> Result<FetchedApiResponse> {
-        let storage = self.storage.as_ref()
+    async fn fetch_and_store_get_paginated(
+        &self,
+        category_key: &str,
+        url: &str,
+    ) -> Result<FetchedApiResponse> {
+        let storage = self
+            .storage
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
 
         info!("📥 Fetching paginated GET requests from: {}", url);
@@ -556,7 +588,9 @@ impl ApiFetcher {
 
         // Store the combined raw JSON responses
         let json_str = serde_json::to_string_pretty(&combined_data)?;
-        let storage_key = storage.store_raw_json_with_category(&self.config.api.name, category_key, &json_str).await?;
+        let storage_key = storage
+            .store_raw_json_with_category(&self.config.api.name, category_key, &json_str)
+            .await?;
 
         Ok(FetchedApiResponse {
             category_key: category_key.to_string(),
@@ -569,8 +603,14 @@ impl ApiFetcher {
     }
 
     /// Fetch and store GraphQL request (storage mode)
-    async fn fetch_and_store_graphql_single(&self, category_key: &str, category_id: &str) -> Result<FetchedApiResponse> {
-        let storage = self.storage.as_ref()
+    async fn fetch_and_store_graphql_single(
+        &self,
+        category_key: &str,
+        category_id: &str,
+    ) -> Result<FetchedApiResponse> {
+        let storage = self
+            .storage
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
 
         info!("📥 Fetching GraphQL request for category: {}", category_id);
@@ -579,7 +619,9 @@ impl ApiFetcher {
 
         // Store the raw JSON response
         let json_str = serde_json::to_string_pretty(&data)?;
-        let storage_key = storage.store_raw_json_with_category(&self.config.api.name, category_key, &json_str).await?;
+        let storage_key = storage
+            .store_raw_json_with_category(&self.config.api.name, category_key, &json_str)
+            .await?;
 
         Ok(FetchedApiResponse {
             category_key: category_key.to_string(),
@@ -592,11 +634,20 @@ impl ApiFetcher {
     }
 
     /// Fetch and store paginated POST requests (storage mode)
-    async fn fetch_and_store_post_paginated(&self, category_key: &str, category_slug: &str) -> Result<FetchedApiResponse> {
-        let storage = self.storage.as_ref()
+    async fn fetch_and_store_post_paginated(
+        &self,
+        category_key: &str,
+        category_slug: &str,
+    ) -> Result<FetchedApiResponse> {
+        let storage = self
+            .storage
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Storage not configured for storage mode"))?;
 
-        info!("📥 Fetching paginated POST requests for category: {}", category_slug);
+        info!(
+            "📥 Fetching paginated POST requests for category: {}",
+            category_slug
+        );
 
         let mut all_raw_responses = Vec::new();
         let mut page = 0; // BazaarApp uses 0-based pagination
@@ -614,7 +665,10 @@ impl ApiFetcher {
                 break;
             }
 
-            info!("📥 Fetching POST page {} for category {}", page, category_slug);
+            info!(
+                "📥 Fetching POST page {} for category {}",
+                page, category_slug
+            );
 
             let request_body = self
                 .config
@@ -645,8 +699,8 @@ impl ApiFetcher {
             // Store the raw API response as-is
             all_raw_responses.push(raw_data.clone());
 
-            // Check if this page has products to determine if we should continue
-            let products = self.extract_products(&raw_data)?;
+            // Check if this page has products to determine if we should continue (silently)
+            let products = self.extract_products_silently(&raw_data)?;
             if products.is_empty() {
                 consecutive_empty_pages += 1;
                 info!(
@@ -689,7 +743,9 @@ impl ApiFetcher {
 
         // Store the combined raw JSON responses
         let json_str = serde_json::to_string_pretty(&combined_data)?;
-        let storage_key = storage.store_raw_json_with_category(&self.config.api.name, category_key, &json_str).await?;
+        let storage_key = storage
+            .store_raw_json_with_category(&self.config.api.name, category_key, &json_str)
+            .await?;
 
         Ok(FetchedApiResponse {
             category_key: category_key.to_string(),
@@ -720,5 +776,10 @@ impl ApiFetcher {
     fn extract_products(&self, data: &Value) -> Result<Vec<Value>> {
         // Delegate to data extractor
         self.extractor.extract_products(data)
+    }
+
+    fn extract_products_silently(&self, data: &Value) -> Result<Vec<Value>> {
+        // Delegate to data extractor (silent mode for pagination checks)
+        self.extractor.extract_products_silently(data)
     }
 }

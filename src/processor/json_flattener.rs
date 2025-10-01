@@ -6,6 +6,10 @@ use tracing::{info, warn};
 
 use super::preprocessors::base::{PreprocessorRegistry};
 use super::preprocessors::kravemart::KraveMartPreprocessor;
+use super::preprocessors::bazaarapp::BazaarAppPreprocessor;
+use super::preprocessors::dealcart::DealCartPreprocessor;
+use super::preprocessors::naheed::NaheedPreprocessor;
+use super::preprocessors::pandamart::PandamartPreprocessor;
 use super::field_extractors::{FieldExtractor, StandardFieldExtractor};
 use super::dataframe_builder::DataFrameBuilder;
 
@@ -20,7 +24,11 @@ impl JsonFlattener {
     pub fn new() -> Self {
         // Set up preprocessor registry with all available preprocessors
         let preprocessor_registry = PreprocessorRegistry::new()
-            .register(KraveMartPreprocessor::new());
+            .register(KraveMartPreprocessor::new())
+            .register(BazaarAppPreprocessor::new())
+            .register(DealCartPreprocessor::new())
+            .register(NaheedPreprocessor::new())
+            .register(PandamartPreprocessor::new());
 
         // Use standard field extractor
         let field_extractor = Box::new(StandardFieldExtractor::new());

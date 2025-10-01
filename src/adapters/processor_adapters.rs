@@ -2,7 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 // Removed unused polars::prelude import
 
-use crate::processor::{FieldClassifier, HtmlProcessor, JsonFlattener, RuleNormalizer};
+use crate::processor::{FieldClassifier, JsonFlattener, RuleNormalizer};
 use crate::traits::data_processor::{
     DataProcessor, DataType, PerformanceMetrics, ProcessorInput, ProcessorMetadata,
     ProcessorOutput, ProcessorType,
@@ -210,76 +210,7 @@ impl DataProcessor for RuleNormalizerAdapter {
     }
 }
 
-/// Adapter that makes HtmlProcessor compatible with DataProcessor trait
-pub struct HtmlProcessorAdapter {
-    #[allow(dead_code)]
-    processor: HtmlProcessor,
-}
 
-impl HtmlProcessorAdapter {
-    pub fn new() -> Self {
-        Self {
-            processor: HtmlProcessor::new(),
-        }
-    }
-}
-
-#[async_trait]
-impl DataProcessor for HtmlProcessorAdapter {
-    fn name(&self) -> &str {
-        "html_processor"
-    }
-
-    fn processor_type(&self) -> ProcessorType {
-        ProcessorType::Transformer
-    }
-
-    async fn process(&self, input: ProcessorInput) -> Result<ProcessorOutput> {
-        match input {
-            ProcessorInput::Html(html) => {
-                // For now, we'll do basic HTML processing
-                // In a real implementation, we'd first extract ScrapedProducts from HTML
-                // then use self.processor.process_scraped_products()
-                // As a placeholder, we'll return cleaned HTML text
-                let cleaned_html = html.trim().to_string();
-                Ok(ProcessorOutput::Text(cleaned_html))
-            }
-            _ => Err(anyhow::anyhow!("HtmlProcessor can only process HTML input")),
-        }
-    }
-
-    fn can_process(&self, input_type: &DataType) -> bool {
-        matches!(input_type, DataType::Html)
-    }
-
-    fn output_type(&self, input_type: &DataType) -> Result<DataType> {
-        if self.can_process(input_type) {
-            Ok(DataType::Json)
-        } else {
-            Err(anyhow::anyhow!(
-                "Cannot process input type: {:?}",
-                input_type
-            ))
-        }
-    }
-
-    fn metadata(&self) -> ProcessorMetadata {
-        ProcessorMetadata {
-            name: "html_processor".to_string(),
-            description: Some("Processes HTML content and extracts structured data".to_string()),
-            version: Some("1.0.0".to_string()),
-            supported_input_types: vec![DataType::Html],
-            supported_output_types: vec![DataType::Json],
-            configuration_schema: None,
-            performance_metrics: Some(PerformanceMetrics {
-                average_processing_time_ms: 200.0,
-                throughput_items_per_second: 100.0,
-                memory_usage_mb: 30.0,
-                success_rate: 0.95,
-            }),
-        }
-    }
-}
 
 /// Factory for creating processor adapters
 pub struct ProcessorAdapterFactory;
@@ -297,9 +228,7 @@ impl ProcessorAdapterFactory {
         Box::new(RuleNormalizerAdapter::new())
     }
 
-    pub fn create_html_processor() -> Box<dyn DataProcessor> {
-        Box::new(HtmlProcessorAdapter::new())
-    }
+
 
     pub fn create_standard_pipeline() -> Vec<Box<dyn DataProcessor>> {
         vec![
@@ -314,7 +243,7 @@ impl ProcessorAdapterFactory {
             "json_flattener" => Ok(Self::create_json_flattener()),
             "field_classifier" => Ok(Self::create_field_classifier()),
             "rule_normalizer" => Ok(Self::create_rule_normalizer()),
-            "html_processor" => Ok(Self::create_html_processor()),
+
             _ => Err(anyhow::anyhow!("Unknown processor: {}", name)),
         }
     }
@@ -324,7 +253,7 @@ impl ProcessorAdapterFactory {
             "json_flattener",
             "field_classifier",
             "rule_normalizer",
-            "html_processor",
+
         ]
     }
 }
@@ -347,8 +276,4 @@ impl Default for RuleNormalizerAdapter {
     }
 }
 
-impl Default for HtmlProcessorAdapter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+

@@ -6,7 +6,7 @@ use std::time::Instant;
 use tracing::{info, warn};
 
 use crate::extractor::ScrapedProduct;
-use crate::processor::{FieldClassifier, HtmlProcessor, JsonFlattener, RuleNormalizer};
+use crate::processor::{FieldClassifier, JsonFlattener, RuleNormalizer};
 use crate::storage::MinioStorage;
 
 /// Unified processing pipeline that standardizes data flow regardless of source type
@@ -25,7 +25,6 @@ pub struct UnifiedPipeline {
     flattener: JsonFlattener,
     classifier: FieldClassifier,
     normalizer: RuleNormalizer,
-    html_processor: HtmlProcessor,
 }
 
 /// Pipeline execution context containing metadata and options
@@ -73,7 +72,6 @@ impl UnifiedPipeline {
             flattener: JsonFlattener::new(),
             classifier: FieldClassifier::new(),
             normalizer: RuleNormalizer,
-            html_processor: HtmlProcessor::new(),
         }
     }
 
@@ -175,10 +173,43 @@ impl UnifiedPipeline {
                     }
                 }
 
-                self.html_processor
-                    .process_scraped_products(scraped_products)
+                // Convert ScrapedProduct to JSON format for preprocessor processing
+                self.convert_scraped_products_to_json(scraped_products)
             }
         }
+    }
+
+    /// Convert ScrapedProduct to JSON format for preprocessor processing
+    fn convert_scraped_products_to_json(&self, scraped_products: Vec<ScrapedProduct>) -> Result<Vec<Value>> {
+        let mut json_products = Vec::new();
+
+        for product in scraped_products {
+            // Basic validation
+            if product.name.is_empty() || product.price.is_empty() || product.product_id.is_empty() {
+                warn!("Skipping invalid product: name={}, price={}, id={}",
+                      product.name, product.price, product.product_id);
+                continue;
+            }
+
+            // Create basic JSON object that will be processed by source-specific preprocessors
+            let json_product = serde_json::json!({
+                "name": product.name.trim(),
+                "price": product.price.trim(),
+                "product_id": product.product_id.trim(),
+                "category": product.category.trim(),
+                "url": product.url,
+                "source_type": "html", // This is the key field for HTML preprocessor detection
+                "raw_html": product.raw_html,
+                "category_path": product.category_path,
+                "page_name": product.page_name,
+                "page_number": product.page_number
+            });
+
+            json_products.push(json_product);
+        }
+
+        info!("✅ Converted {} scraped products to JSON format", json_products.len());
+        Ok(json_products)
     }
 
     /// Store raw data in storage

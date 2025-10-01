@@ -5,7 +5,10 @@ use std::sync::Arc;
 use std::time::Instant;
 use tracing::{error, info, warn};
 
-use crate::traits::{ExecutionStatus, PipelineResult as TraitPipelineResult, pipeline::PipelineMetrics, RawSourceData};
+use crate::traits::{
+    ExecutionStatus, PipelineResult as TraitPipelineResult, RawSourceData,
+    pipeline::PipelineMetrics,
+};
 
 use crate::adapters::{
     ApiSourceAdapter, HtmlSourceAdapter, MinioStorageAdapter, MinioStorageConfig,
@@ -109,8 +112,10 @@ impl PipelineOrchestrator {
         );
 
         // Create unified pipeline using trait-based architecture
-        let mut pipeline =
-            UnifiedPipelineAdapter::new("main_orchestrator_pipeline".to_string(), minio_storage.clone());
+        let mut pipeline = UnifiedPipelineAdapter::new(
+            "main_orchestrator_pipeline".to_string(),
+            minio_storage.clone(),
+        );
 
         // Define available sources with their configurations
         let mut sources = HashMap::new();
@@ -196,16 +201,18 @@ impl PipelineOrchestrator {
     }
 
     /// Create a storage-enabled HTML source for two-stage processing
-    async fn create_html_source_with_storage(&self, source_def: &SourceDefinition) -> Result<Box<dyn DataSource>> {
+    async fn create_html_source_with_storage(
+        &self,
+        source_def: &SourceDefinition,
+    ) -> Result<Box<dyn DataSource>> {
         let html_config = HtmlConfig::from_file(&source_def.config_path).with_context(|| {
             format!("Failed to load HTML config from {}", source_def.config_path)
         })?;
 
-        let adapter = HtmlSourceAdapter::new_with_storage(html_config, self.minio_storage.clone()).await?;
+        let adapter =
+            HtmlSourceAdapter::new_with_storage(html_config, self.minio_storage.clone()).await?;
         Ok(Box::new(adapter))
     }
-
-
 
     /// Process HTML source using two-stage approach (fetch → store → scrape)
     async fn process_html_source_two_stage(
@@ -213,7 +220,10 @@ impl PipelineOrchestrator {
         source_def: &SourceDefinition,
         context: &PipelineContext,
     ) -> Result<TraitPipelineResult> {
-        info!("🔄 Starting two-stage HTML processing for: {}", source_def.name);
+        info!(
+            "🔄 Starting two-stage HTML processing for: {}",
+            source_def.name
+        );
 
         // Create storage-enabled HTML source
         let html_source = self.create_html_source_with_storage(source_def).await?;
@@ -230,9 +240,8 @@ impl PipelineOrchestrator {
         };
 
         // Process the data through the pipeline stages
-        let temp_pipeline = crate::pipeline::unified_pipeline::UnifiedPipeline::new(
-            self.minio_storage.clone()
-        );
+        let temp_pipeline =
+            crate::pipeline::unified_pipeline::UnifiedPipeline::new(self.minio_storage.clone());
 
         let unified_context = crate::pipeline::unified_pipeline::PipelineContext {
             source_name: source_def.name.clone(),
@@ -277,7 +286,10 @@ impl PipelineOrchestrator {
         source_def: &SourceDefinition,
         context: &PipelineContext,
     ) -> Result<TraitPipelineResult> {
-        info!("🔄 Starting two-stage API processing for: {}", source_def.name);
+        info!(
+            "🔄 Starting two-stage API processing for: {}",
+            source_def.name
+        );
 
         // Load API config
         let api_config = ApiConfig::from_file(&source_def.config_path).with_context(|| {
@@ -286,13 +298,20 @@ impl PipelineOrchestrator {
 
         // Stage 1: Fetch and store raw API responses (no extraction)
         info!("📥 Stage 1: Fetching and storing raw API responses");
-        let fetcher = crate::fetcher::ApiFetcher::new_with_storage(api_config.clone(), self.minio_storage.clone()).await?;
+        let fetcher = crate::fetcher::ApiFetcher::new_with_storage(
+            api_config.clone(),
+            self.minio_storage.clone(),
+        )
+        .await?;
         let _fetched_responses = fetcher.fetch_and_store_only().await?;
         info!("✅ Stage 1 complete: Raw API responses stored");
 
         // Stage 2: Load stored raw data and extract products
         info!("🔄 Stage 2: Loading stored data and extracting products");
-        let stored_raw_data = self.minio_storage.load_all_raw_data(&source_def.name).await?;
+        let stored_raw_data = self
+            .minio_storage
+            .load_all_raw_data(&source_def.name)
+            .await?;
 
         // Extract products using the API extractor
         let extractor = crate::extractor::ApiExtractor::new(api_config);
@@ -303,15 +322,17 @@ impl PipelineOrchestrator {
             all_products.extend(products);
         }
 
-        info!("✅ Stage 2 complete: Extracted {} products", all_products.len());
+        info!(
+            "✅ Stage 2 complete: Extracted {} products",
+            all_products.len()
+        );
 
         // Convert to RawData for pipeline processing
         let raw_data = crate::pipeline::unified_pipeline::RawData::Json(all_products);
 
         // Process the data through the pipeline stages
-        let temp_pipeline = crate::pipeline::unified_pipeline::UnifiedPipeline::new(
-            self.minio_storage.clone()
-        );
+        let temp_pipeline =
+            crate::pipeline::unified_pipeline::UnifiedPipeline::new(self.minio_storage.clone());
 
         let unified_context = crate::pipeline::unified_pipeline::PipelineContext {
             source_name: source_def.name.clone(),
@@ -417,7 +438,8 @@ impl PipelineOrchestrator {
                     .await
             } else if source_def.source_type == SourceType::Html {
                 // For HTML sources, use two-stage processing (fetch → store → scrape)
-                self.process_html_source_two_stage(&source_def, &context).await
+                self.process_html_source_two_stage(&source_def, &context)
+                    .await
             } else if source_def.source_type == SourceType::Json {
                 // For API sources, use two-stage processing (fetch → store → extract)
                 self.process_api_source(&source_def, &context).await
@@ -441,7 +463,9 @@ impl PipelineOrchestrator {
                             source_name: source_def.name.clone(),
                             success: false,
                             products_count: 0,
-                            error_message: Some("No products fetched - possible API/scraping issue".to_string()),
+                            error_message: Some(
+                                "No products fetched - possible API/scraping issue".to_string(),
+                            ),
                             processing_time_ms: processing_time,
                         });
                     } else {
@@ -508,8 +532,6 @@ impl PipelineOrchestrator {
             source_results,
         })
     }
-
-
 
     /// Create pipeline context for a source
     fn create_pipeline_context(

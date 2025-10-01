@@ -15,8 +15,18 @@ impl ApiExtractor {
         Self { config }
     }
 
-    /// Extract products from API response data
+    /// Extract products from API response data (with logging)
     pub fn extract_products(&self, data: &Value) -> Result<Vec<Value>> {
+        self.extract_products_internal(data, true)
+    }
+
+    /// Extract products silently (for pagination checks during fetch)
+    pub fn extract_products_silently(&self, data: &Value) -> Result<Vec<Value>> {
+        self.extract_products_internal(data, false)
+    }
+
+    /// Internal method for product extraction with optional logging
+    fn extract_products_internal(&self, data: &Value, log_warnings: bool) -> Result<Vec<Value>> {
         if self.config.api.name == "pandamart" {
             let mut products = Vec::new();
             if let Some(category_products) = data
@@ -48,15 +58,20 @@ impl ApiExtractor {
             return Ok(products);
         }
 
-
-
         // Handle array of API responses (from storage mode)
         if let Value::Array(api_responses) = data {
+            // For bazaarapp, the API returns arrays of products directly
+            // So we need to check if this is an array of products or an array of API responses
+            if self.config.api.name == "bazaarapp" {
+                // For bazaarapp, treat the array items as individual products
+                return Ok(api_responses.clone());
+            }
+
             let mut all_products = Vec::new();
 
             for api_response in api_responses {
                 // Extract products from each individual API response
-                let products = self.extract_from_single_response(api_response)?;
+                let products = self.extract_from_single_response(api_response, log_warnings)?;
                 all_products.extend(products);
             }
 
@@ -64,16 +79,23 @@ impl ApiExtractor {
         }
 
         // Handle single API response
-        self.extract_from_single_response(data)
+        self.extract_from_single_response(data, log_warnings)
     }
 
     /// Extract products from a single API response
-    fn extract_from_single_response(&self, data: &Value) -> Result<Vec<Value>> {
+    fn extract_from_single_response(&self, data: &Value, log_warnings: bool) -> Result<Vec<Value>> {
+        // For bazaarapp, if we receive an array directly, it's the products
+        if self.config.api.name == "bazaarapp" && data.is_array() {
+            if let Value::Array(products) = data {
+                return Ok(products.clone());
+            }
+        }
+
         // Try different extraction patterns based on configuration
         if let Some(ref extraction_path) = self.config.response.data_path {
             let extracted = self.extract_by_path(data, extraction_path)?;
             // Flatten the result if it's a list of lists
-            return Ok(extracted
+            let flattened: Vec<Value> = extracted
                 .into_iter()
                 .flat_map(|v| {
                     if let Value::Array(arr) = v {
@@ -82,14 +104,13 @@ impl ApiExtractor {
                         vec![v]
                     }
                 })
-                .collect());
+                .collect();
+            return Ok(flattened);
         }
 
         // Fallback to common patterns
-        self.extract_by_common_patterns(data)
+        self.extract_by_common_patterns(data, log_warnings)
     }
-
-
 
     /// Extract data using configured path
     pub fn extract_by_path(&self, data: &Value, path: &str) -> Result<Vec<Value>> {
@@ -127,7 +148,11 @@ impl ApiExtractor {
     }
 
     /// Extract using common API response patterns
-    pub fn extract_by_common_patterns(&self, data: &Value) -> Result<Vec<Value>> {
+    pub fn extract_by_common_patterns(
+        &self,
+        data: &Value,
+        log_warnings: bool,
+    ) -> Result<Vec<Value>> {
         // Common patterns for API responses
         let patterns = [
             "data.products",
@@ -159,7 +184,9 @@ impl ApiExtractor {
             return Ok(arr.clone());
         }
 
-        warn!("No products found using any extraction pattern");
+        if log_warnings {
+            warn!("No products found using any extraction pattern");
+        }
         Ok(vec![])
     }
 
@@ -215,8 +242,8 @@ impl ApiExtractor {
             }
         }
 
-        // Check if current response has data
-        let products = self.extract_products(data).unwrap_or_default();
+        // Check if current response has data (silently, for pagination check only)
+        let products = self.extract_products_silently(data).unwrap_or_default();
 
         // If we got fewer products than page size, probably no more pages
         if let Some(page_size) = self.config.request.page_size {
